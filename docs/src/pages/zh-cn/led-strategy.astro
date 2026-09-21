@@ -1,548 +1,584 @@
 ---
 import "../../styles/hardware-tokens.css";
 
-const groups = [
-  { id: "power", index: "01", title: "电源域", subtitle: "关机与休眠只接受有限操作" },
-  { id: "boot", index: "02", title: "启动与配置", subtitle: "开机、恢复出厂与配网" },
-  { id: "normal", index: "03", title: "系统正常", subtitle: "运行态可关机或重置配网" },
-  { id: "exception", index: "04", title: "提示与异常", subtitle: "按优先级覆盖正常运行态" },
-  { id: "charge", index: "05", title: "充电覆盖层", subtitle: "仅在关机或休眠时生效，不是独立系统状态" },
-];
-
-const systemStates = [
+const primaryStates = [
   {
     id: "power-off",
-    group: "power",
-    label: "POWER OFF",
-    title: "关机 / 彻底断电",
-    summary: "LED 熄灭，只保留开机与恢复出厂的按钮侦测。",
-    led: "熄灭",
-    ledDetail: "基础状态不点亮 LED。插入 USB 时，由充电覆盖层决定是否显示充电色。",
-    ledClass: "off",
+    index: "01",
+    code: "POWER OFF",
+    title: "关机",
+    subtitle: "彻底断电 / 仅保留受限输入",
     tone: "offline",
-    button: ["按住 1.5 秒：开机", "按住 6 秒 → 插入 USB → 再保持 6 秒：恢复出厂设置"],
-    transitions: ["按住 1.5 秒 → 开机音 → 初始化配网", "电量低于 20% → 拒绝开机，并重复橙色慢闪", "插入 USB → 进入充电覆盖逻辑"],
-    buzzer: "无独立提示音；开机后播放上升和旋 3 音节。",
-    note: "低于 20% 的开机限制属于关机态启动守卫，不改变关机的基础 LED 定义。",
+    type: "独立系统状态",
+    summary: "基础 LED 熄灭。只响应开机与恢复出厂；USB 充电仅在关机或休眠时覆盖 LED。",
+    logics: [
+      {
+        id: "off-base",
+        label: "彻底断电",
+        trigger: "未插 USB，设备已关机",
+        title: "基础关机",
+        led: "LED 熄灭",
+        ledClass: "off",
+        behavior: "不显示运行或充电颜色；仅保留低功耗按键侦测。",
+        result: "按住 1.5 秒可进入开机序列",
+        key: "按住 1.5 秒：开机；按住 6 秒：进入恢复出厂检测",
+        buzzer: "无独立提示音。成功开机后播放上升和旋 3 音节。",
+      },
+      {
+        id: "charge-active",
+        label: "USB + 有电池 / 充电中",
+        trigger: "关机或休眠 + 插入 USB + 电池未满",
+        title: "充电显示覆盖",
+        led: "橙色常亮",
+        ledClass: "orange-steady",
+        behavior: "充电状态覆盖关机 / 休眠基础灯效；不是独立系统状态。",
+        result: "充满后切换绿色常亮；拔出 USB 后恢复基础灯效",
+        key: "沿用关机 / 休眠按键规则",
+        buzzer: "未指定。",
+      },
+      {
+        id: "charge-full",
+        label: "USB + 有电池 / 已充满",
+        trigger: "关机或休眠 + USB + 检测到充电完成",
+        title: "充满显示覆盖",
+        led: "绿色常亮",
+        ledClass: "green-steady",
+        behavior: "只表达“已充满”；开机后不再通过 LED 显示充电状态。",
+        result: "拔出 USB 后恢复基础灯效",
+        key: "沿用关机 / 休眠按键规则",
+        buzzer: "未指定。",
+      },
+      {
+        id: "charge-no-battery",
+        label: "USB + 无电池",
+        trigger: "关机或休眠 + USB + 未检测到电池",
+        title: "无电池 USB 逻辑",
+        led: "保持系统状态颜色",
+        ledClass: "neutral",
+        behavior: "不显示橙色或绿色充电灯色；关机基础态保持熄灭。",
+        result: "插入电池后切换到有电池的充电策略",
+        key: "沿用关机 / 休眠按键规则",
+        buzzer: "未指定。",
+      },
+      {
+        id: "low-start-block",
+        label: "低电量开机阻止",
+        trigger: "电量低于 20% 时尝试按住 1.5 秒开机",
+        title: "启动守卫",
+        led: "橙色慢闪",
+        ledClass: "orange-slow",
+        behavior: "重复提示电量不足，避免静默启动失败。",
+        result: "保持关机，等待充电满足启动条件",
+        key: "按住 1.5 秒：拒绝开机",
+        buzzer: "未指定。",
+      },
+      {
+        id: "factory-reset",
+        label: "恢复出厂设置",
+        trigger: "关机 → 按住 6 秒 → 插入 USB → 再保持 6 秒",
+        title: "受保护复位",
+        led: "LED 未指定（待确认）",
+        ledClass: "neutral",
+        behavior: "清除设置后转到“初始化 / 未配网”。",
+        result: "进入初始化配网",
+        key: "仅在上述连续动作完整成立时触发",
+        buzzer: "滴 1 声。",
+      },
+    ],
   },
   {
-    id: "sleep",
-    group: "power",
-    label: "SLEEP",
-    title: "系统休眠",
-    summary: "基础 LED 熄灭，只响应开机操作；USB 充电可覆盖灯效。",
-    led: "熄灭（基础）",
-    ledDetail: "在未充电时维持熄灭。USB + 有电池时显示充电颜色；无电池时保持系统状态色。",
-    ledClass: "off",
-    tone: "offline",
-    button: ["按住 1.5 秒：开机"],
-    transitions: ["按住 1.5 秒 → 开机音 → 初始化配网", "低电量休眠 → 启动被阻止", "插入 USB → 进入充电覆盖逻辑"],
-    buzzer: "无独立提示音；成功开机后播放上升和旋 3 音节。",
-    note: "休眠和关机共享充电显示边界：开机状态不通过 LED 显示充电状态。",
-  },
-  {
-    id: "low-sleep",
-    group: "power",
-    label: "LOW POWER SLEEP",
-    title: "低电量休眠",
-    summary: "因低电量进入休眠后，按住 1.5 秒不能开机。",
-    led: "橙色慢闪（反馈）",
-    ledDetail: "用户尝试开机时重复橙色慢闪，明确提示电量不足而不是静默失败。",
-    ledClass: "orange-slow",
-    tone: "warning",
-    button: ["按住 1.5 秒：拒绝开机，并重复橙色慢闪"],
-    transitions: ["连接 USB 且有电池 → 充电覆盖层", "充电满足启动条件后 → 按正常开机路径"],
-    buzzer: "未指定；页面不推定额外蜂鸣器。",
-    note: "此节点表示低电量休眠的按键结果，避免与普通休眠的可开机路径混淆。",
-  },
-  {
-    id: "startup",
-    group: "boot",
-    label: "BOOT",
-    title: "开机序列",
-    summary: "按键满足 1.5 秒后启动，随后进入系统初始化与配网。",
-    led: "交由下一阶段定义",
-    ledDetail: "输入策略没有给出独立的开机过渡色；本图不新增未定义灯效。",
-    ledClass: "neutral",
+    id: "init",
+    index: "02",
+    code: "INIT / UNPAIRED",
+    title: "开机 · 初始化 / 未配网",
+    subtitle: "开机、恢复出厂后的初始化路径",
     tone: "info",
-    button: ["开机过程中不单列按键策略"],
-    transitions: ["关机 / 普通休眠按住 1.5 秒 → 开机序列", "开机序列 → 初始化配网"],
-    buzzer: "上升和旋 3 音节，参考 DJI Inspire 无人机开机的听感方向。",
-    note: "开机音与最终工作态 LED 分开表达，避免蜂鸣器与 LED 时序相互覆盖。",
+    type: "独立系统状态",
+    summary: "设备启动后进入初始化和配网；配网完成后进入系统空闲（Idle）。",
+    logics: [
+      {
+        id: "boot-sequence",
+        label: "开机序列",
+        trigger: "关机 / 普通休眠状态下按住 1.5 秒",
+        title: "启动音与初始化入口",
+        led: "LED 交由下一阶段定义",
+        ledClass: "neutral",
+        behavior: "不额外定义过渡灯色，直接进入系统初始化。",
+        result: "进入初始化配网",
+        key: "开机过程中不单列按键策略",
+        buzzer: "上升和旋 3 音节；听感方向参考 DJI Inspire 无人机开机。",
+      },
+      {
+        id: "pairing",
+        label: "初始化配网",
+        trigger: "首次启动 / 恢复出厂完成 / 正常态重置配网",
+        title: "未配网状态",
+        led: "蓝色快闪",
+        ledClass: "blue-fast",
+        behavior: "蓝色快闪表示正在初始化和配网；应同时显示“正在配网”文字。",
+        result: "配网完成后进入系统空闲（Idle）",
+        key: "正常运行态按住 6 秒：重新进入配网",
+        buzzer: "未指定。",
+      },
+    ],
   },
   {
-    id: "factory-reset",
-    group: "boot",
-    label: "FACTORY RESET",
-    title: "恢复出厂设置",
-    summary: "关机状态的受保护操作，需要长按、插入 USB、再次保持的连续动作。",
-    led: "未指定（需确认）",
-    ledDetail: "需求只规定恢复出厂时的蜂鸣器，未指定 LED 颜色或闪烁节奏。",
-    ledClass: "neutral",
-    tone: "warning",
-    button: ["关机 → 按住 6 秒 → 插入 USB → 再保持 6 秒"],
-    transitions: ["触发成功 → 清除设置 → 初始化配网"],
-    buzzer: "滴 1 声。",
-    note: "这是待产品确认的 LED 缺口；页面有意保留为“未指定”，不以颜色暗示默认结果。",
+    id: "debug",
+    index: "03",
+    code: "DEBUG",
+    title: "开机 · 调试模式",
+    subtitle: "以主机连接状态决定子逻辑",
+    tone: "accent",
+    type: "独立系统状态",
+    summary: "调试模式的主状态保持不变；上位机连接与否决定绿色常亮或彩虹呼吸。",
+    logics: [
+      {
+        id: "host-offline",
+        label: "上位机未连接",
+        trigger: "进入调试模式，但未建立主机链路",
+        title: "调试待连接",
+        led: "绿色常亮",
+        ledClass: "green-steady",
+        behavior: "表示调试模式已就绪，但不能代表主机已连接。",
+        result: "主机建立连接后切换为彩虹呼吸",
+        key: "按住 1.5 秒：关机；按住 6 秒：重置配网",
+        buzzer: "关机时播放下降和旋 3 音节。",
+      },
+      {
+        id: "host-linked",
+        label: "上位机已连接",
+        trigger: "调试模式中主机链路建立",
+        title: "调试已连接",
+        led: "彩虹呼吸",
+        ledClass: "rainbow-breathe",
+        behavior: "只用于“调试模式 + 上位机已连接”的组合状态。",
+        result: "主机断开后回到绿色常亮",
+        key: "按住 1.5 秒：关机；按住 6 秒：重置配网",
+        buzzer: "关机时播放下降和旋 3 音节。",
+      },
+    ],
   },
   {
-    id: "pairing",
-    group: "boot",
-    label: "NETWORK SETUP",
-    title: "系统初始化配网",
-    summary: "启动后进行配网，完成后进入正常 Idle。",
-    led: "蓝色快闪",
-    ledDetail: "蓝色快闪表示初始化与配网过程，必须同时显示“正在配网”文字。",
-    ledClass: "blue-fast",
-    tone: "info",
-    button: ["未定义额外按键操作"],
-    transitions: ["开机序列 → 初始化配网", "恢复出厂完成 → 初始化配网", "配网完成 → Idle"],
-    buzzer: "未指定；页面不推定额外蜂鸣器。",
-    note: "此前双击重置配网已被“按住 6 秒”替代；本图以长按策略为准。",
+    id: "program",
+    index: "04",
+    code: "USER PROGRAM",
+    title: "开机 · 用户程序",
+    subtitle: "用户业务正在运行",
+    tone: "accent",
+    type: "独立系统状态",
+    summary: "用户程序运行期间 LED 为白色常亮；告警与错误可临时覆盖 LED，不改写程序状态。",
+    logics: [
+      {
+        id: "program-running",
+        label: "用户程序运行",
+        trigger: "从 Idle 启动用户任务",
+        title: "运行态",
+        led: "白色常亮",
+        ledClass: "white-steady",
+        behavior: "白色常亮表达用户程序正在执行；开机状态不显示充电灯色。",
+        result: "程序结束后进入系统空闲（Idle）",
+        key: "按住 1.5 秒：关机；按住 6 秒：重置配网",
+        buzzer: "关机时播放下降和旋 3 音节。",
+      },
+      {
+        id: "peripheral-hotplug",
+        label: "外设热插入",
+        trigger: "用户程序运行中检测到外设插入",
+        title: "热插入反馈",
+        led: "保持白色常亮",
+        ledClass: "white-steady",
+        behavior: "不改变用户程序的主状态或常规 LED 输出。",
+        result: "继续运行用户程序",
+        key: "按键策略不变",
+        buzzer: "短促上升和弦，2 音节。",
+      },
+    ],
   },
   {
     id: "idle",
-    group: "normal",
-    label: "IDLE",
-    title: "系统正常 / Idle",
-    summary: "常规待机与空闲态；将原“LED 熄灭（待定）”建模为绿色呼吸建议。",
-    led: "绿色呼吸（建议）",
-    ledDetail: "建议采用低幅绿色呼吸，替代原先待定的熄灭策略，以表达设备已正常运行。",
-    ledClass: "green-breathe",
+    index: "05",
+    code: "IDLE",
+    title: "开机 · 系统空闲（Idle）",
+    subtitle: "正常待机与任务入口",
     tone: "accent",
-    button: ["按住 1.5 秒：关机", "按住 6 秒：重置配网"],
-    transitions: ["启动配网完成 → Idle", "运行任务 → 用户程序", "进入调试 → 调试模式", "低电量 / 告警 / 异常 → 对应高优先级状态"],
-    buzzer: "关机时播放下降和旋 3 音节。",
-    note: "绿色仅代表“设备正常可用”，不承担充电显示。若量产决定保留熄灭，可把此节点的 LED 策略改为熄灭而不影响其他转移。",
+    type: "独立系统状态",
+    summary: "系统正常、未运行用户程序时的空闲态；LED 采用建议的低幅绿色呼吸。",
+    logics: [
+      {
+        id: "idle-ready",
+        label: "系统空闲",
+        trigger: "初始化配网完成 / 用户程序结束",
+        title: "可用待机",
+        led: "绿色呼吸（建议）",
+        ledClass: "green-breathe",
+        behavior: "建议用低幅绿色呼吸替代原先待定的“熄灭”，明确设备已正常可用。",
+        result: "可启动用户程序或进入调试模式",
+        key: "按住 1.5 秒：关机；按住 6 秒：重置配网",
+        buzzer: "关机时播放下降和旋 3 音节。",
+      },
+      {
+        id: "idle-reset-pairing",
+        label: "重置配网",
+        trigger: "Idle 状态下按住 6 秒",
+        title: "重新配网入口",
+        led: "蓝色快闪",
+        ledClass: "blue-fast",
+        behavior: "该操作替代旧版“双击按钮重置配网”。",
+        result: "进入初始化 / 未配网",
+        key: "按住 6 秒：重置配网",
+        buzzer: "未指定。",
+      },
+    ],
   },
   {
-    id: "user-program",
-    group: "normal",
-    label: "USER PROGRAM",
-    title: "系统正常 / 用户程序",
-    summary: "用户程序运行中，白色常亮作为工作态指示。",
-    led: "白色常亮",
-    ledDetail: "白色常亮明确表示用户程序正在运行；充电状态不在开机态叠加显示。",
-    ledClass: "white-steady",
-    tone: "accent",
-    button: ["按住 1.5 秒：关机", "按住 6 秒：重置配网"],
-    transitions: ["Idle 启动任务 → 用户程序", "程序结束 → Idle", "低电量 / 告警 / 异常 → 对应高优先级状态"],
-    buzzer: "关机时播放下降和旋 3 音节；外设热插入播放短促上升和弦 2 音节。",
-    note: "此处的“用户程序”是普通开机运行态，因此完整支持 1.5 秒关机与 6 秒重置配网。",
-  },
-  {
-    id: "debug-disconnected",
-    group: "normal",
-    label: "DEBUG / HOST OFFLINE",
-    title: "调试模式 / 上位机未连接",
-    summary: "调试功能启用但上位机未连接，维持绿色常亮。",
-    led: "绿色常亮",
-    ledDetail: "绿色常亮表示调试模式已就绪，但不能作为“上位机已连接”的唯一提示。",
-    ledClass: "green-steady",
-    tone: "accent",
-    button: ["按住 1.5 秒：关机", "按住 6 秒：重置配网"],
-    transitions: ["进入调试 → 调试模式（上位机未连接）", "上位机连接 → 彩虹呼吸", "低电量 / 告警 / 异常 → 对应高优先级状态"],
-    buzzer: "关机时播放下降和旋 3 音节。",
-    note: "连接与未连接使用不同光效，避免把绿色常亮误读为主机已经连接。",
-  },
-  {
-    id: "debug-connected",
-    group: "normal",
-    label: "DEBUG / HOST LINKED",
-    title: "调试模式 / 上位机已连接",
-    summary: "调试模式与上位机链路同时成立时，显示彩虹呼吸。",
-    led: "彩虹呼吸",
-    ledDetail: "彩虹呼吸仅用于“调试 + 上位机已连接”这一组合状态，并须配合连接文字。",
-    ledClass: "rainbow-breathe",
-    tone: "accent",
-    button: ["按住 1.5 秒：关机", "按住 6 秒：重置配网"],
-    transitions: ["上位机连接 → 彩虹呼吸", "上位机断开 → 绿色常亮", "低电量 / 告警 / 异常 → 对应高优先级状态"],
-    buzzer: "关机时播放下降和旋 3 音节。",
-    note: "彩虹为明确的调试连接信号，不用于其他成功或充电状态。",
-  },
-  {
-    id: "notice",
-    group: "exception",
-    label: "NOTICE",
-    title: "系统提示 / 提醒级",
-    summary: "电量低于 20% 及其他弱提示，系统仍可继续工作。",
-    led: "橙色慢闪",
-    ledDetail: "橙色慢闪表示需要关注但非立即中断；结合文字说明提示来源。",
-    ledClass: "orange-slow",
+    id: "warning",
+    index: "06",
+    code: "WARNING OVERLAY",
+    title: "开机 · 系统告警",
+    subtitle: "仅覆盖 LED，不改变原有运行状态",
     tone: "warning",
-    button: ["未改变正常运行态的按键策略"],
-    transitions: ["电量低于 20% 等弱提示 → 提醒级提示", "电量低于 5% → 橙色快闪 10 秒 → 系统休眠"],
-    buzzer: "未指定；页面不推定额外蜂鸣器。",
-    note: "提醒是对正常态的提示覆盖；程序 / 调试状态的业务逻辑仍可恢复。",
-  },
-  {
-    id: "critical-low",
-    group: "exception",
-    label: "CRITICAL LOW BATTERY",
-    title: "临界低电量倒计时",
-    summary: "电量低于 5% 时，橙色快闪 10 秒后转入系统休眠。",
-    led: "橙色快闪 10 秒",
-    ledDetail: "快闪时长固定为 10 秒；该倒计时结束后系统进入休眠，不继续停留在临界低电量态。",
-    ledClass: "orange-fast",
-    tone: "warning",
-    button: ["倒计时期间未定义额外按键策略"],
-    transitions: ["提醒级提示 + 电量低于 5% → 本状态", "10 秒后 → 系统休眠", "休眠后按 1.5 秒但电量不足 → 拒绝开机 / 橙色慢闪"],
-    buzzer: "未指定；页面不推定额外蜂鸣器。",
-    note: "把“10 秒”放在状态转移中，而非单独 LED 配置中，便于固件实现可测的计时行为。",
+    type: "LED 覆盖状态",
+    summary: "告警覆盖当前的 Idle、用户程序或调试主状态；告警解除后应回到原状态的 LED 输出。",
+    logics: [
+      {
+        id: "notice-low20",
+        label: "提醒级告警",
+        trigger: "电量低于 20% 或其他弱提示",
+        title: "可继续运行的提醒",
+        led: "橙色慢闪",
+        ledClass: "orange-slow",
+        behavior: "只覆盖 LED；Idle、用户程序或调试模式本身不发生状态改变。",
+        result: "提示解除后恢复原主状态 LED",
+        key: "沿用被覆盖主状态的按键策略",
+        buzzer: "未指定。",
+      },
+      {
+        id: "notice-low5",
+        label: "临界低电量",
+        trigger: "电量低于 5%",
+        title: "自动休眠倒计时",
+        led: "橙色快闪 10 秒",
+        ledClass: "orange-fast",
+        behavior: "告警覆盖持续 10 秒；倒计时结束后，系统退出开机态并进入休眠。",
+        result: "10 秒后进入低电量休眠",
+        key: "倒计时期间未定义额外按键策略",
+        buzzer: "未指定。",
+      },
+      {
+        id: "low-power-sleep",
+        label: "低电量休眠后的开机尝试",
+        trigger: "已低电量休眠，再按住 1.5 秒",
+        title: "低电量启动阻止",
+        led: "橙色慢闪",
+        ledClass: "orange-slow",
+        behavior: "用重复橙色慢闪说明当前不是普通休眠，不允许直接开机。",
+        result: "保持休眠，等待 USB 充电",
+        key: "按住 1.5 秒：拒绝开机",
+        buzzer: "未指定。",
+      },
+    ],
   },
   {
     id: "upgrade",
-    group: "exception",
-    label: "WARNING / UPGRADE",
-    title: "系统告警 / 系统升级",
-    summary: "不可中断操作进行中，按键全部不响应。",
-    led: "红色慢闪",
-    ledDetail: "产品策略将升级等不可打断流程标记为红色慢闪；旁边必须明确写出“不可打断”。",
-    ledClass: "red-slow",
+    index: "07",
+    code: "UPGRADE",
+    title: "开机 · 系统升级",
+    subtitle: "不可打断的系统操作",
     tone: "danger",
-    button: ["所有按键操作：不响应"],
-    transitions: ["升级或不可打断操作开始 → 本状态", "操作完成 → 回到之前的正常运行态（默认 Idle）"],
-    buzzer: "未指定；页面不推定额外蜂鸣器。",
-    note: "虽然名称为 Warning，但 LED 色由原始需求指定为红色；本页保留该产品语义。",
+    type: "独立保护状态",
+    summary: "系统升级期间按键完全锁定；完成后回到进入升级前的开机主状态。",
+    logics: [
+      {
+        id: "upgrade-running",
+        label: "升级进行中",
+        trigger: "开始系统升级或其他不可打断操作",
+        title: "升级保护",
+        led: "红色慢闪",
+        ledClass: "red-slow",
+        behavior: "红色慢闪明确提示当前操作不可中断。",
+        result: "操作完成后返回升级前的开机主状态",
+        key: "所有按键操作：不响应",
+        buzzer: "未指定。",
+      },
+    ],
   },
   {
     id: "error",
-    group: "exception",
-    label: "ERROR",
-    title: "系统异常 / Error",
-    summary: "高温或系统无法正常工作的错误态；只允许关机。",
-    led: "红色快闪",
-    ledDetail: "红色快闪与错误文字共同提示不可继续运行；快速反馈在减少动态效果模式下会静止呈现。",
-    ledClass: "red-fast",
+    index: "08",
+    code: "ERROR",
+    title: "开机 · 系统错误",
+    subtitle: "高温或系统不可正常工作",
     tone: "danger",
-    button: ["仅响应关机操作", "其他按键：不响应"],
-    transitions: ["高温或致命错误 → 本状态", "关机操作 → 关机 / 彻底断电"],
-    buzzer: "使用与恢复出厂相同的音调音节，短促连续播放 3 遍。",
-    note: "错误态优先于用户程序、调试与普通提醒；诊断日志应由固件另行保留。",
-  },
-  {
-    id: "charge-battery",
-    group: "charge",
-    label: "USB + BATTERY",
-    title: "USB 充电 / 有电池",
-    summary: "只在关机或休眠时覆盖 LED；充电中与充满使用不同常亮颜色。",
-    led: "充电中橙色常亮 / 充满绿色常亮",
-    ledDetail: "充电中显示橙色常亮；检测到充电完成后切换为绿色常亮。开机状态不显示该充电覆盖。",
-    ledClass: "charge",
-    tone: "warning",
-    button: ["不引入额外按键规则；沿用关机 / 休眠的操作范围"],
-    transitions: ["关机或休眠 + 插入 USB + 有电池 → 充电覆盖", "拔出 USB → 回到基础系统 LED", "设备开机 → 隐藏充电覆盖，显示当前开机态 LED"],
-    buzzer: "未指定；页面不推定插入 USB 的蜂鸣器。",
-    note: "充电是显示覆盖层，不应在状态机中替代关机或休眠节点。",
-  },
-  {
-    id: "charge-no-battery",
-    group: "charge",
-    label: "USB / NO BATTERY",
-    title: "USB 充电 / 无电池",
-    summary: "不显示充电颜色，只保留当前系统状态颜色。",
-    led: "保持系统状态颜色",
-    ledDetail: "无电池时不点亮橙色或绿色充电色；在关机 / 休眠基础态中通常仍为熄灭。",
-    ledClass: "neutral",
-    tone: "offline",
-    button: ["不引入额外按键规则；沿用关机 / 休眠的操作范围"],
-    transitions: ["关机或休眠 + 插入 USB + 无电池 → 本覆盖逻辑", "插入电池 → 切换到 USB + 有电池策略", "设备开机 → 仅显示当前开机态 LED"],
-    buzzer: "未指定；页面不推定额外蜂鸣器。",
-    note: "“无电池”不是充电失败提示；它的核心规则是禁止误导性的充电灯色。",
+    type: "独立保护状态",
+    summary: "系统不可继续正常工作时进入 Error；只允许执行关机操作。",
+    logics: [
+      {
+        id: "fatal-error",
+        label: "致命错误",
+        trigger: "高温错误或系统无法正常工作的错误态",
+        title: "错误保护",
+        led: "红色快闪",
+        ledClass: "red-fast",
+        behavior: "错误灯效优先于所有正常运行灯效，提示用户停止继续使用。",
+        result: "关机操作后回到关机状态",
+        key: "仅响应关机操作；其他按键不响应",
+        buzzer: "与恢复出厂相同的音调音节，短促连续播放 3 遍。",
+      },
+    ],
   },
 ];
 
-const initialState = systemStates.find((state) => state.id === "idle")!;
-const stateGroups = groups.map((group) => ({
-  ...group,
-  states: systemStates.filter((state) => state.group === group.id),
-}));
+const initialPrimary = primaryStates.find((state) => state.id === "idle")!;
+const initialLogic = initialPrimary.logics[0];
 ---
 
 <html lang="zh-CN">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="ESP-Claw 系统状态、LED 指示灯、按键与蜂鸣器策略交互图。" />
+    <meta name="description" content="ESP-Claw 八个主系统状态及其 LED、按键与蜂鸣器子逻辑。" />
     <title>系统状态与 LED 指示策略 | ESP-Claw</title>
   </head>
   <body>
     <main class="system-page">
       <header class="page-header">
         <div class="eyebrow-row">
-          <span class="eyebrow"><span class="eyebrow-dot" aria-hidden="true"></span>ESP-CLAW / DEVICE POLICY</span>
-          <span class="revision">策略图 · REV 0.1 · 2026-09</span>
+          <span class="eyebrow"><span class="eyebrow-dot" aria-hidden="true"></span>ESP-CLAW / SYSTEM POLICY</span>
+          <span class="revision">八主状态 · REV 0.2 · 2026-09</span>
         </div>
         <div class="hero-grid">
           <div>
-            <p class="kicker">SYSTEM STATE REFERENCE</p>
+            <p class="kicker">STATE → SUB-LOGIC → EFFECT</p>
             <h1>系统状态与 LED 指示策略</h1>
-            <p class="hero-copy">点击状态节点，联动查看 <strong>LED 表现、按键响应、转移条件与蜂鸣器</strong>。充电被建模为只在关机与休眠状态生效的显示覆盖层，而非独立系统状态。</p>
+            <p class="hero-copy">先选择一个<strong>主系统状态</strong>，再选择右侧的<strong>子逻辑</strong>。下方流程会同步高亮当前步骤，右侧显示 LED、按键与蜂鸣器效果。</p>
           </div>
           <aside class="decision-card" aria-label="页面使用说明">
-            <span class="decision-label">首要阅读动作</span>
-            <strong>选择一个状态，核对其输入、输出与离开条件。</strong>
-            <p>状态颜色始终配合文字与图标，避免只靠灯色判断。</p>
+            <span class="decision-label">阅读方式</span>
+            <strong>顶部定主状态，右侧选子逻辑，左侧看一条完整流程。</strong>
+            <p>系统告警仅覆盖 LED；解除后恢复原运行状态的灯效。</p>
             <a class="hw-button-primary source-action" href="/led-strategy-flow.mmd" download>
               <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3v11m0 0 4-4m-4 4-4-4M5 17v3h14v-3" /></svg>
-              下载可编辑流程图
+              下载流程图源码
             </a>
             <a class="source-graphic" href="/led-strategy-flow.png" target="_blank" rel="noreferrer">查看传统流程图 PNG ↗</a>
           </aside>
         </div>
       </header>
 
-      <section class="strategy-summary" aria-label="策略总览">
-        <div class="summary-item">
-          <span class="summary-icon summary-icon--green" aria-hidden="true">01</span>
-          <div><strong>运行态</strong><span>Idle / 用户程序 / 调试</span></div>
+      <section class="primary-section" aria-labelledby="primary-heading">
+        <div class="section-heading primary-heading">
+          <div>
+            <p class="section-eyebrow">01 / PRIMARY SYSTEM STATES</p>
+            <h2 id="primary-heading">八个主系统状态</h2>
+          </div>
+          <p>点击主状态以切换下方的子逻辑流程。</p>
         </div>
-        <div class="summary-item">
-          <span class="summary-icon summary-icon--orange" aria-hidden="true">02</span>
-          <div><strong>提醒优先</strong><span>低电量覆盖正常提示</span></div>
+        <div class="primary-grid" role="list" aria-label="主系统状态">
+          {primaryStates.map((state) => (
+            <button
+              type="button"
+              class={`primary-state primary-state--${state.tone}${state.id === initialPrimary.id ? " is-selected" : ""}`}
+              data-primary={state.id}
+              aria-pressed={state.id === initialPrimary.id ? "true" : "false"}
+            >
+              <span class="primary-index">{state.index}</span>
+              <span class="primary-content"><strong>{state.title}</strong><span>{state.subtitle}</span></span>
+              <span class={`state-mark state-mark--${state.tone}`} aria-hidden="true"></span>
+            </button>
+          ))}
         </div>
-        <div class="summary-item">
-          <span class="summary-icon summary-icon--red" aria-hidden="true">03</span>
-          <div><strong>保护优先</strong><span>升级锁键 / 错误仅可关机</span></div>
-        </div>
-        <div class="summary-item">
-          <span class="summary-icon summary-icon--blue" aria-hidden="true">04</span>
-          <div><strong>充电是覆盖层</strong><span>仅关机 / 休眠显示</span></div>
-        </div>
+        <div class="status-note"><span class="status-note-dot" aria-hidden="true"></span><strong>系统告警</strong>为 LED 覆盖状态：它不重置 Idle、用户程序或调试模式；告警解除后恢复原主状态。</div>
       </section>
 
-      <section class="workspace" aria-label="交互式状态策略画布">
+      <section class="strategy-workspace" aria-label="主状态、子逻辑与效果联动">
         <section class="hw-card flow-card" aria-labelledby="flow-heading">
           <div class="section-heading">
             <div>
-              <p class="section-eyebrow">INTERACTIVE FLOW MAP</p>
-              <h2 id="flow-heading">状态流与输出策略</h2>
+              <p class="section-eyebrow">02 / FLOW LOGIC</p>
+              <h2 id="flow-heading">当前主状态的子逻辑</h2>
             </div>
-            <div class="filter-set" role="toolbar" aria-label="筛选状态域">
-              <button class="filter-button is-active" type="button" data-filter="all" aria-pressed="true">全部</button>
-              {groups.map((group) => <button class="filter-button" type="button" data-filter={group.id} aria-pressed="false">{group.title}</button>)}
-            </div>
+            <span id="flow-state-type" class="scope-pill scope-pill--accent">{initialPrimary.type}</span>
           </div>
 
-          <div class="legend" aria-label="LED 图例">
-            <span class="legend-title">LED 语义</span>
-            <span class="legend-item"><i class="mini-led mini-led--green" aria-hidden="true"></i>正常 / 可用</span>
-            <span class="legend-item"><i class="mini-led mini-led--blue" aria-hidden="true"></i>初始化配网</span>
-            <span class="legend-item"><i class="mini-led mini-led--orange" aria-hidden="true"></i>提醒 / 低电量</span>
-            <span class="legend-item"><i class="mini-led mini-led--red" aria-hidden="true"></i>告警 / 错误</span>
-            <span class="legend-item"><i class="mini-led mini-led--gray" aria-hidden="true"></i>熄灭 / 未指定</span>
+          <div class="active-state-bar">
+            <span id="flow-state-index" class="active-state-index">{initialPrimary.index}</span>
+            <div><span id="flow-state-code" class="flow-state-code">{initialPrimary.code}</span><strong id="flow-state-title">{initialPrimary.title}</strong></div>
+            <p id="flow-state-summary">{initialPrimary.summary}</p>
           </div>
 
-          <div class="route-strip" aria-label="主路径摘要">
-            <button type="button" class="route-node" data-state="power-off">关机</button>
-            <span class="route-arrow"><span>按住 1.5 秒</span><i aria-hidden="true"></i></span>
-            <button type="button" class="route-node" data-state="startup">开机序列</button>
-            <span class="route-arrow"><span>初始化</span><i aria-hidden="true"></i></span>
-            <button type="button" class="route-node" data-state="pairing">配网</button>
-            <span class="route-arrow"><span>完成</span><i aria-hidden="true"></i></span>
-            <button type="button" class="route-node route-node--active" data-state="idle">Idle</button>
+          <div class="logic-flow" aria-live="polite">
+            <article class="flow-step" data-flow-step="trigger">
+              <span class="flow-number">01</span>
+              <span class="flow-caption">触发 / 条件</span>
+              <strong id="flow-trigger">{initialLogic.trigger}</strong>
+            </article>
+            <span class="flow-arrow" aria-hidden="true"><i></i></span>
+            <article class="flow-step flow-step--active" data-flow-step="logic">
+              <span class="flow-number">02</span>
+              <span class="flow-caption">当前子逻辑</span>
+              <strong id="flow-logic">{initialLogic.title}</strong>
+              <span id="flow-logic-label" class="flow-tag">{initialLogic.label}</span>
+            </article>
+            <span class="flow-arrow" aria-hidden="true"><i></i></span>
+            <article class="flow-step" data-flow-step="led">
+              <span class="flow-number">03</span>
+              <span class="flow-caption">LED 输出</span>
+              <span id="flow-led-lamp" class={`flow-lamp flow-lamp--${initialLogic.ledClass}`} aria-hidden="true"><span></span></span>
+              <strong id="flow-led">{initialLogic.led}</strong>
+            </article>
+            <span class="flow-arrow" aria-hidden="true"><i></i></span>
+            <article class="flow-step" data-flow-step="result">
+              <span class="flow-number">04</span>
+              <span class="flow-caption">结果 / 下一步</span>
+              <strong id="flow-result">{initialLogic.result}</strong>
+            </article>
           </div>
 
-          <div class="flow-map">
-            {stateGroups.map((group) => (
-              <section class={`flow-group flow-group--${group.id}`} data-flow-group={group.id} aria-labelledby={`group-${group.id}`}>
-                <div class="group-heading">
-                  <span class="group-index">{group.index}</span>
-                  <div><h3 id={`group-${group.id}`}>{group.title}</h3><p>{group.subtitle}</p></div>
-                </div>
-                <div class="node-stack">
-                  {group.states.map((state) => (
-                    <button
-                      type="button"
-                      class={`state-node state-node--${state.tone}${state.id === initialState.id ? " is-selected" : ""}`}
-                      data-state={state.id}
-                      data-state-group={state.group}
-                      aria-pressed={state.id === initialState.id ? "true" : "false"}
-                    >
-                      <span class={`led-lamp led-lamp--${state.ledClass}`} aria-hidden="true"><span></span></span>
-                      <span class="node-content">
-                        <span class="node-label">{state.label}</span>
-                        <strong>{state.title}</strong>
-                        <span class="node-led">{state.led}</span>
-                      </span>
-                      <svg class="node-chevron" aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6" /></svg>
-                    </button>
-                  ))}
-                </div>
-              </section>
-            ))}
-          </div>
-
-          <div class="flow-notes" aria-label="重要转移规则">
-            <div class="flow-note"><span class="rule-code">PWR-01</span><p><strong>关机 / 休眠 + USB</strong>：仅有电池时才显示充电中的橙色常亮或充满后的绿色常亮。</p></div>
-            <div class="flow-note"><span class="rule-code">KEY-06</span><p><strong>开机正常态</strong>：1.5 秒关机；6 秒重置配网。升级锁键，错误仅允许关机。</p></div>
-            <div class="flow-note"><span class="rule-code">LOW-05</span><p><strong>电量 &lt; 5%</strong>：橙色快闪 10 秒，然后进入休眠；低电量休眠不可直接开机。</p></div>
+          <div class="flow-rule-grid">
+            <div class="flow-rule"><span class="rule-code">POWER</span><p>USB 充电只在<strong>关机 / 休眠</strong>时覆盖 LED；所有开机态不显示充电色。</p></div>
+            <div class="flow-rule"><span class="rule-code">KEY</span><p>正常开机态：<strong>1.5 秒关机、6 秒重置配网</strong>；升级锁键，错误仅可关机。</p></div>
+            <div class="flow-rule"><span class="rule-code">LOW BAT</span><p>电量 &lt; 5%：<strong>橙色快闪 10 秒</strong>，随后进入低电量休眠。</p></div>
           </div>
         </section>
 
-        <aside class="hw-card detail-card" aria-labelledby="detail-heading" aria-live="polite">
-          <div class="detail-topline">
-            <span id="detail-group" class="detail-group">正常运行态</span>
-            <span id="detail-state-code" class="detail-code">IDLE</span>
+        <aside class="hw-card effect-card" aria-labelledby="effect-heading" aria-live="polite">
+          <div class="effect-card-topline">
+            <div><p class="section-eyebrow">03 / EFFECT PREVIEW</p><h2 id="effect-heading">选择子逻辑</h2></div>
+            <span id="effect-code" class="effect-code">{initialPrimary.code}</span>
           </div>
-          <div class="detail-title-row">
-            <div>
-              <h2 id="detail-heading" tabindex="-1">{initialState.title}</h2>
-              <p id="detail-summary">{initialState.summary}</p>
-            </div>
-            <span id="detail-tone" class="detail-tone detail-tone--accent" aria-hidden="true"></span>
-          </div>
+          <p id="effect-instruction" class="effect-instruction">选择当前主状态下的一条逻辑；左侧流程会同步高亮。</p>
+          <div id="logic-options" class="logic-options" role="list" aria-label="当前主状态的子逻辑"></div>
 
-          <section class="led-output" aria-label="当前 LED 输出">
-            <div class="led-output-heading"><span>LED OUTPUT</span><strong id="detail-led-label">{initialState.led}</strong></div>
-            <div class="led-visual">
-              <span id="detail-led" class={`led-preview led-preview--${initialState.ledClass}`} aria-hidden="true"><span></span></span>
-              <p id="detail-led-detail">{initialState.ledDetail}</p>
-            </div>
-            <div id="charge-mode" class="charge-mode" hidden>
-              <span><i class="mini-led mini-led--orange" aria-hidden="true"></i>充电中：橙色常亮</span>
-              <span><i class="mini-led mini-led--green" aria-hidden="true"></i>充满：绿色常亮</span>
+          <section class="effect-output" aria-label="LED 效果预览">
+            <div class="effect-output-heading"><span>LED EFFECT</span><strong id="effect-led-label">{initialLogic.led}</strong></div>
+            <div class="effect-led-body">
+              <span id="effect-led" class={`effect-led effect-led--${initialLogic.ledClass}`} aria-hidden="true"><span></span></span>
+              <p id="effect-behavior">{initialLogic.behavior}</p>
             </div>
           </section>
 
-          <section class="detail-section">
-            <div class="detail-section-heading"><span>BUTTON RESPONSE</span><span class="section-line"></span></div>
-            <ul id="detail-button" class="rule-list"></ul>
+          <section class="effect-detail">
+            <div class="detail-heading"><span>BUTTON RESPONSE</span><span></span></div>
+            <p id="effect-key">{initialLogic.key}</p>
           </section>
-          <section class="detail-section">
-            <div class="detail-section-heading"><span>STATE TRANSITIONS</span><span class="section-line"></span></div>
-            <ul id="detail-transitions" class="rule-list rule-list--transition"></ul>
+          <section class="effect-detail">
+            <div class="detail-heading"><span>BUZZER</span><span></span></div>
+            <p id="effect-buzzer">{initialLogic.buzzer}</p>
           </section>
-          <section class="detail-section detail-section--buzzer">
-            <div class="detail-section-heading"><span>BUZZER</span><span class="section-line"></span></div>
-            <p id="detail-buzzer" class="buzzer-copy"></p>
-          </section>
-          <p id="detail-note" class="detail-note"></p>
+          <p class="audio-placeholder"><span aria-hidden="true">◌</span> 音频样本待接入。上传 MP3、WAV、M4A 或 WebM 后，可将对应蜂鸣器策略接为可试听音效。</p>
         </aside>
       </section>
 
-      <section class="support-grid" aria-label="按键、蜂鸣器与优先级参考">
-        <section class="hw-card support-card" aria-labelledby="button-matrix-heading">
-          <div class="section-heading section-heading--compact">
-            <div><p class="section-eyebrow">INPUT MATRIX</p><h2 id="button-matrix-heading">按键响应矩阵</h2></div>
-            <span class="matrix-note">1.5 秒与 6 秒均为按住时长</span>
-          </div>
-          <div class="table-wrap">
-            <table>
-              <thead><tr><th scope="col">状态范围</th><th scope="col">按住 1.5 秒</th><th scope="col">按住 6 秒</th><th scope="col">其他限制</th></tr></thead>
-              <tbody>
-                <tr><th scope="row">关机</th><td>开机</td><td>插 USB 后再保持 6 秒：恢复出厂</td><td>电量 &lt; 20%：拒绝开机，橙色慢闪</td></tr>
-                <tr><th scope="row">休眠</th><td>开机</td><td>未定义</td><td>低电量休眠时，1.5 秒不可开机</td></tr>
-                <tr><th scope="row">Idle / 用户程序 / 调试</th><td>关机</td><td>重置配网</td><td>替代旧版“双击重置配网”</td></tr>
-                <tr><th scope="row">系统升级</th><td>不响应</td><td>不响应</td><td>不可打断操作</td></tr>
-                <tr><th scope="row">系统 Error</th><td>仅关机操作</td><td>不响应</td><td>错误恢复走关机路径</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        <section class="hw-card support-card sound-card" aria-labelledby="sound-heading">
-          <div class="section-heading section-heading--compact">
-            <div><p class="section-eyebrow">AUDIO PATTERNS</p><h2 id="sound-heading">按键与蜂鸣器</h2></div>
-            <span class="sound-chip">非 LED 状态</span>
-          </div>
-          <div class="sound-list">
-            <div class="sound-row"><span class="sound-glyph sound-glyph--up" aria-hidden="true">↗⌁↗</span><div><strong>开机</strong><p>上升和旋 3 音节；参考 DJI Inspire 无人机开机的听感方向。</p></div></div>
-            <div class="sound-row"><span class="sound-glyph sound-glyph--down" aria-hidden="true">↘⌁↘</span><div><strong>关机</strong><p>下降和旋 3 音节，将开机声音逆向播放。</p></div></div>
-            <div class="sound-row"><span class="sound-glyph" aria-hidden="true">●</span><div><strong>恢复出厂设置</strong><p>短促滴 1 声。</p></div></div>
-            <div class="sound-row"><span class="sound-glyph sound-glyph--up" aria-hidden="true">↗↗</span><div><strong>外设热插入</strong><p>短促上升和弦，2 音节。</p></div></div>
-            <div class="sound-row"><span class="sound-glyph sound-glyph--error" aria-hidden="true">● ● ●</span><div><strong>系统异常</strong><p>与恢复出厂相同音调音节，短促播放 3 遍。</p></div></div>
-          </div>
-        </section>
-      </section>
-
-      <section class="implementation-note" aria-labelledby="implementation-heading">
-        <div class="implementation-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3v8m0 4v6m9-9h-8M3 12h5M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8m0-12.8 2.8 2.8m5.2 7.2 2.8 2.8" /></svg></div>
-        <div><p class="section-eyebrow">IMPLEMENTATION NOTE</p><h2 id="implementation-heading">两项待产品确认</h2><p>本图将 <strong>Idle</strong> 的“LED 熄灭（待定）”按原建议建模为<strong>绿色呼吸</strong>；恢复出厂设置的 <strong>LED 表现</strong>未在输入中定义，因此保留为未指定。确认后只需更新对应节点，不影响整张状态机。</p></div>
-        <button class="hw-button-secondary reset-button" type="button" data-reset>回到 Idle</button>
+      <section class="compact-reference" aria-labelledby="reference-heading">
+        <div>
+          <p class="section-eyebrow">IMPLEMENTATION REFERENCE</p>
+          <h2 id="reference-heading">两个待产品确认项</h2>
+        </div>
+        <p><strong>Idle</strong> 当前按建议使用绿色呼吸；若最终确定为 LED 熄灭，只需调整 Idle 子逻辑。<strong>恢复出厂设置</strong>仅定义了“滴 1 声”，未定义 LED 颜色，因此保留为“未指定”。</p>
       </section>
 
       <footer class="page-footer">
         <span>ESP-CLAW · SYSTEM LED POLICY MAP</span>
-        <span>交互方式：点击状态节点，或使用键盘 Tab / Enter 浏览。</span>
+        <span>主状态与子逻辑均支持鼠标、触控和键盘操作。</span>
       </footer>
     </main>
 
-    <script define:vars={{ systemStates, groups }}>
-      const catalog = systemStates;
-      const groupNames = Object.fromEntries(groups.map((group) => [group.id, group.title]));
-      const detail = {
-        group: document.querySelector('#detail-group'),
-        code: document.querySelector('#detail-state-code'),
-        title: document.querySelector('#detail-heading'),
-        summary: document.querySelector('#detail-summary'),
-        tone: document.querySelector('#detail-tone'),
-        ledLabel: document.querySelector('#detail-led-label'),
-        led: document.querySelector('#detail-led'),
-        ledDetail: document.querySelector('#detail-led-detail'),
-        buttons: document.querySelector('#detail-button'),
-        transitions: document.querySelector('#detail-transitions'),
-        buzzer: document.querySelector('#detail-buzzer'),
-        note: document.querySelector('#detail-note'),
-        charge: document.querySelector('#charge-mode'),
+    <script define:vars={{ primaryStates }}>
+      const catalog = primaryStates;
+      const initialPrimaryId = 'idle';
+      const elements = {
+        stateType: document.querySelector('#flow-state-type'),
+        stateIndex: document.querySelector('#flow-state-index'),
+        stateCode: document.querySelector('#flow-state-code'),
+        stateTitle: document.querySelector('#flow-state-title'),
+        stateSummary: document.querySelector('#flow-state-summary'),
+        trigger: document.querySelector('#flow-trigger'),
+        logic: document.querySelector('#flow-logic'),
+        logicLabel: document.querySelector('#flow-logic-label'),
+        flowLamp: document.querySelector('#flow-led-lamp'),
+        flowLed: document.querySelector('#flow-led'),
+        result: document.querySelector('#flow-result'),
+        effectCode: document.querySelector('#effect-code'),
+        instruction: document.querySelector('#effect-instruction'),
+        options: document.querySelector('#logic-options'),
+        effectLedLabel: document.querySelector('#effect-led-label'),
+        effectLed: document.querySelector('#effect-led'),
+        behavior: document.querySelector('#effect-behavior'),
+        key: document.querySelector('#effect-key'),
+        buzzer: document.querySelector('#effect-buzzer'),
       };
 
-      const renderList = (element, items, type) => {
-        element.innerHTML = items.map((item) => `<li><span class="rule-bullet rule-bullet--${type}" aria-hidden="true"></span><span>${item}</span></li>`).join('');
+      let selectedPrimary = catalog.find((state) => state.id === initialPrimaryId) || catalog[0];
+      let selectedLogic = selectedPrimary.logics[0];
+
+      const toneClass = (tone) => tone === 'accent' ? 'accent' : tone;
+
+      const renderOptions = () => {
+        elements.options.innerHTML = selectedPrimary.logics.map((logic, index) => `
+          <button type="button" class="logic-option${logic.id === selectedLogic.id ? ' is-selected' : ''}" data-logic="${logic.id}" aria-pressed="${logic.id === selectedLogic.id}">
+            <span class="logic-option-index">${String(index + 1).padStart(2, '0')}</span>
+            <span><strong>${logic.label}</strong><small>${logic.title}</small></span>
+            <span class="logic-option-check" aria-hidden="true">✓</span>
+          </button>`).join('');
+        elements.options.querySelectorAll('[data-logic]').forEach((button) => {
+          button.addEventListener('click', () => setLogic(button.dataset.logic, true));
+        });
       };
 
-      const setState = (stateId, shouldFocus = false) => {
-        const state = catalog.find((item) => item.id === stateId);
+      const setLogic = (logicId, focusFlow = false) => {
+        const logic = selectedPrimary.logics.find((item) => item.id === logicId);
+        if (!logic) return;
+        selectedLogic = logic;
+        elements.trigger.textContent = logic.trigger;
+        elements.logic.textContent = logic.title;
+        elements.logicLabel.textContent = logic.label;
+        elements.flowLamp.className = `flow-lamp flow-lamp--${logic.ledClass}`;
+        elements.flowLamp.innerHTML = '<span></span>';
+        elements.flowLed.textContent = logic.led;
+        elements.result.textContent = logic.result;
+        elements.effectLedLabel.textContent = logic.led;
+        elements.effectLed.className = `effect-led effect-led--${logic.ledClass}`;
+        elements.effectLed.innerHTML = '<span></span>';
+        elements.behavior.textContent = logic.behavior;
+        elements.key.textContent = logic.key;
+        elements.buzzer.textContent = logic.buzzer;
+        renderOptions();
+        window.history.replaceState(null, '', `#${selectedPrimary.id}/${logic.id}`);
+        if (focusFlow) document.querySelector('[data-flow-step="logic"]').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      };
+
+      const setPrimary = (primaryId) => {
+        const state = catalog.find((item) => item.id === primaryId);
         if (!state) return;
-
-        document.querySelectorAll('[data-state]').forEach((node) => {
-          const selected = node.dataset.state === state.id;
-          node.classList.toggle('is-selected', selected);
-          node.setAttribute('aria-pressed', String(selected));
+        selectedPrimary = state;
+        selectedLogic = state.logics[0];
+        document.querySelectorAll('[data-primary]').forEach((button) => {
+          const selected = button.dataset.primary === state.id;
+          button.classList.toggle('is-selected', selected);
+          button.setAttribute('aria-pressed', String(selected));
         });
-
-        detail.group.textContent = groupNames[state.group];
-        detail.code.textContent = state.label;
-        detail.title.textContent = state.title;
-        detail.summary.textContent = state.summary;
-        detail.tone.className = `detail-tone detail-tone--${state.tone}`;
-        detail.ledLabel.textContent = state.led;
-        detail.led.className = `led-preview led-preview--${state.ledClass}`;
-        detail.led.innerHTML = '<span></span>';
-        detail.ledDetail.textContent = state.ledDetail;
-        detail.charge.hidden = state.id !== 'charge-battery';
-        detail.buzzer.textContent = state.buzzer;
-        detail.note.textContent = state.note;
-        renderList(detail.buttons, state.button, 'button');
-        renderList(detail.transitions, state.transitions, 'transition');
-        window.history.replaceState(null, '', `#${state.id}`);
-
-        if (shouldFocus) detail.title.focus({ preventScroll: true });
+        elements.stateType.textContent = state.type;
+        elements.stateType.className = `scope-pill scope-pill--${toneClass(state.tone)}`;
+        elements.stateIndex.textContent = state.index;
+        elements.stateCode.textContent = state.code;
+        elements.stateTitle.textContent = state.title;
+        elements.stateSummary.textContent = state.summary;
+        elements.effectCode.textContent = state.code;
+        elements.instruction.textContent = `已选择「${state.title}」。选择下方一条子逻辑，左侧流程与右侧效果会同步更新。`;
+        setLogic(selectedLogic.id, false);
       };
 
-      document.querySelectorAll('[data-state]').forEach((node) => {
-        node.addEventListener('click', () => setState(node.dataset.state, false));
+      document.querySelectorAll('[data-primary]').forEach((button) => {
+        button.addEventListener('click', () => setPrimary(button.dataset.primary));
       });
 
-      document.querySelectorAll('[data-filter]').forEach((button) => {
-        button.addEventListener('click', () => {
-          const filter = button.dataset.filter;
-          document.querySelectorAll('[data-filter]').forEach((item) => {
-            const active = item === button;
-            item.classList.toggle('is-active', active);
-            item.setAttribute('aria-pressed', String(active));
-          });
-          document.querySelectorAll('[data-flow-group]').forEach((group) => {
-            group.classList.toggle('is-filtered-out', filter !== 'all' && group.dataset.flowGroup !== filter);
-          });
-        });
-      });
-
-      document.querySelector('[data-reset]').addEventListener('click', () => setState('idle', true));
-
-      const hashState = window.location.hash.slice(1);
-      if (catalog.some((state) => state.id === hashState)) setState(hashState, false);
-      else setState('idle', false);
+      const [requestedPrimary, requestedLogic] = window.location.hash.slice(1).split('/');
+      if (catalog.some((state) => state.id === requestedPrimary)) {
+        setPrimary(requestedPrimary);
+        if (requestedLogic) setLogic(requestedLogic, false);
+      } else {
+        setPrimary(initialPrimaryId);
+      }
     </script>
   </body>
 </html>
@@ -553,249 +589,184 @@ const stateGroups = groups.map((group) => ({
   :global(*) { box-sizing: border-box; }
   :global(button), :global(a) { -webkit-tap-highlight-color: transparent; }
 
-  .system-page {
-    position: relative;
-    isolation: isolate;
-    min-height: 100vh;
-    padding: 40px 24px 24px;
-    overflow: hidden;
-    background:
-      linear-gradient(rgba(65, 83, 77, .08) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(65, 83, 77, .06) 1px, transparent 1px),
-      var(--hw-canvas);
-    background-size: 32px 32px, 32px 32px, auto;
-  }
-  .system-page::before {
-    content: "";
-    position: absolute;
-    z-index: -1;
-    inset: 0 0 auto;
-    height: 380px;
-    background: radial-gradient(ellipse at 72% 0%, rgba(61, 231, 166, .055), transparent 56%);
-    pointer-events: none;
-  }
-  .page-header, .strategy-summary, .workspace, .support-grid, .implementation-note, .page-footer { max-width: 1200px; margin-left: auto; margin-right: auto; }
-  .page-header { padding-bottom: 26px; border-bottom: 1px solid var(--hw-border); }
-  .eyebrow-row, .section-heading, .detail-topline, .led-output-heading, .detail-section-heading, .page-footer { display: flex; align-items: center; justify-content: space-between; gap: var(--hw-space-3); }
-  .eyebrow, .revision, .kicker, .section-eyebrow, .decision-label, .node-label, .group-index, .detail-group, .detail-code, .led-output-heading span, .detail-section-heading, .rule-code, .matrix-note, .sound-chip { font-family: var(--hw-font-mono); font-size: 12px; font-weight: 600; line-height: 18px; letter-spacing: .055em; }
+  .system-page { position: relative; isolation: isolate; min-height: 100vh; padding: 40px 24px 24px; overflow: hidden; background: linear-gradient(rgba(65, 83, 77, .075) 1px, transparent 1px), linear-gradient(90deg, rgba(65, 83, 77, .055) 1px, transparent 1px), var(--hw-canvas); background-size: 32px 32px, 32px 32px, auto; }
+  .system-page::before { content: ""; position: absolute; z-index: -1; inset: 0 0 auto; height: 420px; pointer-events: none; background: radial-gradient(ellipse at 74% -7%, rgba(61, 231, 166, .06), transparent 56%); }
+  .page-header, .primary-section, .strategy-workspace, .compact-reference, .page-footer { max-width: 1200px; margin-right: auto; margin-left: auto; }
+  .page-header { padding-bottom: 24px; border-bottom: 1px solid var(--hw-border); }
+  .eyebrow-row, .section-heading, .effect-card-topline, .effect-output-heading, .detail-heading, .page-footer { display: flex; align-items: center; justify-content: space-between; gap: var(--hw-space-3); }
+  .eyebrow, .revision, .kicker, .section-eyebrow, .decision-label, .primary-index, .scope-pill, .active-state-index, .flow-state-code, .flow-number, .flow-caption, .rule-code, .effect-code, .effect-output-heading span, .detail-heading { font-family: var(--hw-font-mono); font-size: 12px; font-weight: 600; line-height: 18px; letter-spacing: .055em; }
   .eyebrow { display: inline-flex; align-items: center; gap: 8px; color: var(--hw-accent); }
   .eyebrow-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--hw-accent); box-shadow: 0 0 0 4px rgba(61, 231, 166, .1); }
   .revision { color: var(--hw-text-tertiary); }
-  .hero-grid { display: grid; grid-template-columns: minmax(0, 1fr) 330px; align-items: end; gap: 40px; margin-top: 28px; }
+  .hero-grid { display: grid; grid-template-columns: minmax(0, 1fr) 328px; align-items: end; gap: 40px; margin-top: 28px; }
   .kicker, .section-eyebrow { margin: 0 0 8px; color: var(--hw-text-tertiary); }
   h1, h2, h3, p { margin-top: 0; }
-  h1 { max-width: 720px; margin-bottom: 14px; font-size: clamp(32px, 4.4vw, 48px); line-height: 1.12; letter-spacing: -.035em; }
-  h2 { font-size: 18px; line-height: 26px; letter-spacing: -.01em; }
-  .hero-copy { max-width: 765px; margin-bottom: 0; color: var(--hw-text-secondary); font-size: 16px; line-height: 26px; }
+  h1 { max-width: 740px; margin-bottom: 14px; font-size: clamp(32px, 4.4vw, 48px); line-height: 1.12; letter-spacing: -.035em; }
+  h2 { margin-bottom: 0; font-size: 18px; line-height: 26px; letter-spacing: -.01em; }
+  .hero-copy { max-width: 760px; margin-bottom: 0; color: var(--hw-text-secondary); font-size: 16px; line-height: 26px; }
   .hero-copy strong { color: var(--hw-text); font-weight: 600; }
   .decision-card { padding: 18px; border: 1px solid var(--hw-border-strong); border-radius: var(--hw-radius-card); background: rgba(24, 33, 31, .82); box-shadow: var(--hw-shadow-card); }
   .decision-label { display: block; margin-bottom: 8px; color: var(--hw-accent); }
   .decision-card strong { display: block; font-size: 14px; line-height: 22px; }
   .decision-card p { margin: 8px 0 16px; color: var(--hw-text-secondary); font-size: 13px; line-height: 20px; }
   .source-action { display: inline-flex; width: 100%; align-items: center; justify-content: center; gap: 8px; min-height: 40px; text-decoration: none; }
-  .source-action svg, .implementation-mark svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .source-action svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   .source-graphic { display: inline-block; margin-top: 10px; color: var(--hw-text-secondary); font-size: 12px; text-decoration-color: var(--hw-border-strong); text-underline-offset: 3px; }
   .source-graphic:hover { color: var(--hw-text); text-decoration-color: var(--hw-accent); }
 
-  .strategy-summary { display: grid; grid-template-columns: repeat(4, 1fr); margin-top: 24px; border: 1px solid var(--hw-border); border-radius: var(--hw-radius-card); background: var(--hw-surface-1); overflow: hidden; box-shadow: var(--hw-shadow-card); }
-  .summary-item { display: flex; align-items: center; gap: 12px; min-height: 74px; padding: 14px 16px; border-right: 1px solid var(--hw-border); }
-  .summary-item:last-child { border-right: 0; }
-  .summary-icon { display: grid; flex: 0 0 32px; width: 32px; height: 32px; place-items: center; border: 1px solid var(--hw-border-strong); border-radius: 8px; font-family: var(--hw-font-mono); font-size: 12px; font-weight: 700; }
-  .summary-icon--green { color: var(--hw-accent); background: var(--hw-accent-soft); }
-  .summary-icon--orange { color: var(--hw-warning); background: var(--hw-warning-soft); }
-  .summary-icon--red { color: var(--hw-danger); background: var(--hw-danger-soft); }
-  .summary-icon--blue { color: var(--hw-info); background: var(--hw-info-soft); }
-  .summary-item strong { display: block; font-size: 13px; }
-  .summary-item span:last-child { display: block; color: var(--hw-text-tertiary); font-size: 12px; line-height: 18px; }
+  .primary-section { margin-top: 24px; }
+  .primary-heading { align-items: flex-end; margin-bottom: 12px; }
+  .primary-heading > p { max-width: 270px; margin: 0; color: var(--hw-text-tertiary); font-size: 12px; line-height: 18px; text-align: right; }
+  .primary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid var(--hw-border); border-radius: var(--hw-radius-card); overflow: hidden; box-shadow: var(--hw-shadow-card); }
+  .primary-state { display: grid; grid-template-columns: 26px minmax(0, 1fr) 8px; align-items: center; min-height: 80px; gap: 10px; padding: 14px; border: 0; border-right: 1px solid var(--hw-border); border-bottom: 1px solid var(--hw-border); background: var(--hw-surface-1); color: var(--hw-text); text-align: left; cursor: pointer; transition: background-color var(--hw-transition-fast), box-shadow var(--hw-transition-fast); }
+  .primary-state:nth-child(4n) { border-right: 0; }
+  .primary-state:nth-child(n + 5) { border-bottom: 0; }
+  .primary-state:hover { background: var(--hw-surface-raised); }
+  .primary-state.is-selected { background: var(--hw-accent-soft); box-shadow: inset 0 0 0 1px var(--hw-accent); }
+  .primary-state--info.is-selected { background: var(--hw-info-soft); box-shadow: inset 0 0 0 1px var(--hw-info); }
+  .primary-state--warning.is-selected { background: var(--hw-warning-soft); box-shadow: inset 0 0 0 1px var(--hw-warning); }
+  .primary-state--danger.is-selected { background: var(--hw-danger-soft); box-shadow: inset 0 0 0 1px var(--hw-danger); }
+  .primary-state--offline.is-selected { background: var(--hw-surface-raised); box-shadow: inset 0 0 0 1px var(--hw-border-strong); }
+  .primary-index { align-self: start; color: var(--hw-text-tertiary); font-size: 10px; }
+  .primary-content { min-width: 0; }
+  .primary-content strong { display: block; overflow: hidden; font-size: 13px; line-height: 18px; text-overflow: ellipsis; white-space: nowrap; }
+  .primary-content span { display: block; overflow: hidden; margin-top: 2px; color: var(--hw-text-tertiary); font-size: 11px; line-height: 16px; text-overflow: ellipsis; white-space: nowrap; }
+  .state-mark { width: 7px; height: 7px; border-radius: 50%; background: var(--hw-offline); }
+  .state-mark--accent { background: var(--hw-accent); box-shadow: 0 0 9px rgba(61, 231, 166, .66); }
+  .state-mark--info { background: var(--hw-info); box-shadow: 0 0 9px rgba(102, 199, 255, .66); }
+  .state-mark--warning { background: var(--hw-warning); box-shadow: 0 0 9px rgba(255, 189, 89, .66); }
+  .state-mark--danger { background: var(--hw-danger); box-shadow: 0 0 9px rgba(255, 101, 120, .66); }
+  .status-note { display: flex; align-items: center; gap: 8px; margin-top: 10px; color: var(--hw-text-secondary); font-size: 12px; line-height: 18px; }
+  .status-note strong { color: var(--hw-warning); font-weight: 600; }
+  .status-note-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--hw-warning); box-shadow: 0 0 9px rgba(255, 189, 89, .6); }
 
-  .workspace { display: grid; grid-template-columns: minmax(0, 1.72fr) minmax(320px, .86fr); align-items: start; gap: 20px; margin-top: 20px; }
-  .flow-card, .detail-card, .support-card { overflow: hidden; }
+  .strategy-workspace { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(330px, .82fr); align-items: start; gap: 20px; margin-top: 20px; }
+  .flow-card, .effect-card { overflow: hidden; }
   .flow-card { padding: 20px; }
   .section-heading { align-items: flex-start; }
-  .section-heading h2 { margin-bottom: 0; }
-  .filter-set { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
-  .filter-button { min-height: 30px; padding: 4px 10px; border: 1px solid var(--hw-border); border-radius: var(--hw-radius-pill); background: var(--hw-surface-2); color: var(--hw-text-secondary); cursor: pointer; font-size: 12px; transition: border-color var(--hw-transition-fast), background-color var(--hw-transition-fast), color var(--hw-transition-fast); }
-  .filter-button:hover { border-color: var(--hw-border-strong); color: var(--hw-text); }
-  .filter-button.is-active { border-color: var(--hw-accent); background: var(--hw-accent-soft); color: var(--hw-accent); }
+  .scope-pill { display: inline-flex; flex: 0 0 auto; align-items: center; min-height: 26px; padding: 4px 8px; border: 1px solid var(--hw-border); border-radius: var(--hw-radius-pill); color: var(--hw-text-secondary); font-size: 10px; letter-spacing: .02em; }
+  .scope-pill--accent { border-color: rgba(61, 231, 166, .34); color: var(--hw-accent); background: var(--hw-accent-soft); }
+  .scope-pill--info { border-color: rgba(102, 199, 255, .34); color: var(--hw-info); background: var(--hw-info-soft); }
+  .scope-pill--warning { border-color: rgba(255, 189, 89, .34); color: var(--hw-warning); background: var(--hw-warning-soft); }
+  .scope-pill--danger { border-color: rgba(255, 101, 120, .34); color: var(--hw-danger); background: var(--hw-danger-soft); }
+  .scope-pill--offline { color: var(--hw-offline); background: var(--hw-surface-raised); }
+  .active-state-bar { display: grid; grid-template-columns: 30px minmax(135px, .8fr) minmax(0, 1.4fr); gap: 12px; align-items: center; margin-top: 16px; padding: 13px; border: 1px solid var(--hw-border); border-radius: 10px; background: rgba(10, 15, 14, .5); }
+  .active-state-index { color: var(--hw-accent); }
+  .flow-state-code { display: block; color: var(--hw-text-tertiary); font-size: 10px; }
+  .active-state-bar strong { display: block; margin-top: 2px; font-size: 14px; line-height: 20px; }
+  .active-state-bar p { margin: 0; color: var(--hw-text-secondary); font-size: 12px; line-height: 18px; }
 
-  .legend { display: flex; flex-wrap: wrap; gap: 9px 14px; margin-top: 18px; padding: 12px 0; border-top: 1px solid var(--hw-border); border-bottom: 1px solid var(--hw-border); color: var(--hw-text-secondary); font-size: 12px; line-height: 18px; }
-  .legend-title { color: var(--hw-text-tertiary); font-weight: 600; }
-  .legend-item { display: inline-flex; align-items: center; gap: 6px; }
-  .mini-led { display: inline-block; width: 8px; height: 8px; border-radius: 50%; box-shadow: 0 0 10px currentColor; }
-  .mini-led--green { color: var(--hw-accent); background: var(--hw-accent); }
-  .mini-led--blue { color: var(--hw-info); background: var(--hw-info); }
-  .mini-led--orange { color: var(--hw-warning); background: var(--hw-warning); }
-  .mini-led--red { color: var(--hw-danger); background: var(--hw-danger); }
-  .mini-led--gray { color: var(--hw-offline); background: var(--hw-offline); box-shadow: none; }
+  .logic-flow { display: grid; grid-template-columns: minmax(0, 1.05fr) 22px minmax(0, 1fr) 22px minmax(0, .9fr) 22px minmax(0, 1.05fr); align-items: stretch; gap: 5px; margin-top: 16px; }
+  .flow-step { display: flex; min-width: 0; flex-direction: column; align-items: flex-start; padding: 14px; border: 1px solid var(--hw-border); border-radius: 10px; background: var(--hw-surface-2); transition: border-color var(--hw-transition-fast), background-color var(--hw-transition-fast); }
+  .flow-step--active { border-color: var(--hw-accent); background: var(--hw-accent-soft); box-shadow: inset 0 0 0 1px rgba(61, 231, 166, .26); }
+  .flow-number { color: var(--hw-text-tertiary); font-size: 10px; }
+  .flow-caption { margin-top: 8px; color: var(--hw-text-tertiary); font-size: 10px; letter-spacing: .04em; }
+  .flow-step strong { display: -webkit-box; overflow: hidden; margin-top: 5px; font-size: 13px; line-height: 19px; -webkit-box-orient: vertical; -webkit-line-clamp: 4; }
+  .flow-tag { display: block; overflow: hidden; max-width: 100%; margin-top: 7px; padding: 3px 6px; border: 1px solid rgba(61, 231, 166, .28); border-radius: 999px; color: var(--hw-accent); font-size: 10px; line-height: 14px; text-overflow: ellipsis; white-space: nowrap; }
+  .flow-arrow { display: grid; place-items: center; }
+  .flow-arrow i { position: relative; display: block; width: 18px; height: 1px; background: var(--hw-border-strong); }
+  .flow-arrow i::after { content: ""; position: absolute; top: -3px; right: 0; width: 6px; height: 6px; border-top: 1px solid var(--hw-border-strong); border-right: 1px solid var(--hw-border-strong); transform: rotate(45deg); }
+  .flow-lamp { display: grid; width: 25px; height: 25px; place-items: center; margin-top: 8px; border: 1px solid var(--hw-border-strong); border-radius: 50%; background: #070a09; }
+  .flow-lamp > span { width: 13px; height: 13px; border-radius: 50%; }
+  .flow-lamp--off > span, .flow-lamp--neutral > span { background: var(--hw-offline); opacity: .28; }
+  .flow-lamp--green-steady > span, .flow-lamp--green-breathe > span { background: var(--hw-accent); box-shadow: 0 0 9px var(--hw-accent); }
+  .flow-lamp--blue-fast > span { background: var(--hw-info); box-shadow: 0 0 9px var(--hw-info); animation: flash-fast 1.15s ease-in-out infinite; }
+  .flow-lamp--orange-steady > span, .flow-lamp--orange-slow > span, .flow-lamp--orange-fast > span { background: var(--hw-warning); box-shadow: 0 0 9px var(--hw-warning); }
+  .flow-lamp--orange-slow > span { animation: flash-slow 2.1s ease-in-out infinite; }
+  .flow-lamp--orange-fast > span { animation: flash-fast 1.1s ease-in-out infinite; }
+  .flow-lamp--red-slow > span, .flow-lamp--red-fast > span { background: var(--hw-danger); box-shadow: 0 0 9px var(--hw-danger); }
+  .flow-lamp--red-slow > span { animation: flash-slow 2.1s ease-in-out infinite; }
+  .flow-lamp--red-fast > span { animation: flash-fast 1.05s ease-in-out infinite; }
+  .flow-lamp--white-steady > span { background: #f1f6f3; box-shadow: 0 0 9px #f1f6f3; }
+  .flow-lamp--rainbow-breathe > span { background: conic-gradient(#ff6578, #ffbd59, #3de7a6, #66c7ff, #c681ff, #ff6578); box-shadow: 0 0 9px #d3a6ff; animation: breathe 2.2s ease-in-out infinite; }
+  .flow-lamp--green-breathe > span { animation: breathe 2.2s ease-in-out infinite; }
+  .flow-rule-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 16px; }
+  .flow-rule { display: grid; grid-template-columns: auto 1fr; gap: 7px; padding: 10px; border-left: 2px solid var(--hw-border-strong); border-radius: 0 8px 8px 0; background: rgba(24, 33, 31, .6); }
+  .rule-code { color: var(--hw-text-tertiary); font-size: 9px; }
+  .flow-rule p { margin: 0; color: var(--hw-text-secondary); font-size: 11px; line-height: 17px; }
+  .flow-rule strong { color: var(--hw-text); font-weight: 600; }
 
-  .route-strip { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 18px 0; padding: 12px; border: 1px solid var(--hw-border); border-radius: 10px; background: rgba(10, 15, 14, .48); overflow-x: auto; }
-  .route-node { flex: 0 0 auto; min-height: 30px; padding: 4px 9px; border: 1px solid var(--hw-border-strong); border-radius: 7px; background: var(--hw-surface-2); color: var(--hw-text-secondary); cursor: pointer; font-size: 12px; }
-  .route-node:hover { border-color: var(--hw-text-secondary); color: var(--hw-text); }
-  .route-node--active { border-color: var(--hw-accent); color: var(--hw-accent); background: var(--hw-accent-soft); }
-  .route-arrow { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 6px; color: var(--hw-text-tertiary); font-family: var(--hw-font-mono); font-size: 10px; white-space: nowrap; }
-  .route-arrow i { display: block; position: relative; width: 20px; height: 1px; background: var(--hw-border-strong); }
-  .route-arrow i::after { content: ""; position: absolute; top: -3px; right: 0; width: 6px; height: 6px; border-top: 1px solid var(--hw-border-strong); border-right: 1px solid var(--hw-border-strong); transform: rotate(45deg); }
+  .effect-card { position: sticky; top: 18px; padding: 20px; background: var(--hw-surface-1); box-shadow: var(--hw-shadow-panel); }
+  .effect-card-topline { align-items: flex-start; }
+  .effect-code { max-width: 138px; overflow: hidden; padding-top: 2px; color: var(--hw-accent); font-size: 10px; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
+  .effect-instruction { margin: 8px 0 12px; color: var(--hw-text-secondary); font-size: 12px; line-height: 18px; }
+  .logic-options { display: grid; gap: 6px; max-height: 252px; padding-right: 2px; overflow: auto; }
+  .logic-option { display: grid; grid-template-columns: 24px minmax(0, 1fr) 18px; align-items: center; gap: 8px; width: 100%; min-height: 49px; padding: 8px; border: 1px solid var(--hw-border); border-radius: 9px; background: var(--hw-surface-2); color: var(--hw-text); text-align: left; cursor: pointer; transition: border-color var(--hw-transition-fast), background-color var(--hw-transition-fast); }
+  .logic-option:hover { border-color: var(--hw-border-strong); background: var(--hw-surface-raised); }
+  .logic-option.is-selected { border-color: var(--hw-accent); background: var(--hw-accent-soft); }
+  .logic-option-index { color: var(--hw-text-tertiary); font-family: var(--hw-font-mono); font-size: 10px; }
+  .logic-option strong { display: block; overflow: hidden; font-size: 12px; line-height: 17px; text-overflow: ellipsis; white-space: nowrap; }
+  .logic-option small { display: block; overflow: hidden; color: var(--hw-text-tertiary); font-size: 10px; line-height: 15px; text-overflow: ellipsis; white-space: nowrap; }
+  .logic-option-check { color: transparent; font-size: 13px; text-align: center; }
+  .logic-option.is-selected .logic-option-check { color: var(--hw-accent); }
+  .effect-output { margin-top: 14px; padding: 12px; border: 1px solid var(--hw-border); border-radius: 10px; background: #0c1210; }
+  .effect-output-heading { align-items: baseline; }
+  .effect-output-heading span, .detail-heading { color: var(--hw-text-tertiary); font-size: 10px; letter-spacing: .06em; }
+  .effect-output-heading strong { font-size: 12px; line-height: 18px; text-align: right; }
+  .effect-led-body { display: grid; grid-template-columns: 52px minmax(0, 1fr); align-items: center; gap: 12px; margin-top: 9px; }
+  .effect-led { display: grid; width: 48px; height: 48px; place-items: center; border: 1px solid var(--hw-border-strong); border-radius: 50%; background: #070a09; }
+  .effect-led > span { width: 27px; height: 27px; border-radius: 50%; }
+  .effect-led--off > span, .effect-led--neutral > span { background: var(--hw-offline); opacity: .25; }
+  .effect-led--green-steady > span, .effect-led--green-breathe > span { background: var(--hw-accent); box-shadow: 0 0 18px var(--hw-accent); }
+  .effect-led--green-breathe > span { animation: breathe 2.2s ease-in-out infinite; }
+  .effect-led--blue-fast > span { background: var(--hw-info); box-shadow: 0 0 18px var(--hw-info); animation: flash-fast 1.15s ease-in-out infinite; }
+  .effect-led--orange-steady > span, .effect-led--orange-slow > span, .effect-led--orange-fast > span { background: var(--hw-warning); box-shadow: 0 0 18px var(--hw-warning); }
+  .effect-led--orange-slow > span { animation: flash-slow 2.1s ease-in-out infinite; }
+  .effect-led--orange-fast > span { animation: flash-fast 1.1s ease-in-out infinite; }
+  .effect-led--red-slow > span, .effect-led--red-fast > span { background: var(--hw-danger); box-shadow: 0 0 18px var(--hw-danger); }
+  .effect-led--red-slow > span { animation: flash-slow 2.1s ease-in-out infinite; }
+  .effect-led--red-fast > span { animation: flash-fast 1.05s ease-in-out infinite; }
+  .effect-led--white-steady > span { background: #f1f6f3; box-shadow: 0 0 18px #f1f6f3; }
+  .effect-led--rainbow-breathe > span { background: conic-gradient(#ff6578, #ffbd59, #3de7a6, #66c7ff, #c681ff, #ff6578); box-shadow: 0 0 18px #d3a6ff; animation: breathe 2.2s ease-in-out infinite; }
+  .effect-led-body p { margin: 0; color: var(--hw-text-secondary); font-size: 12px; line-height: 18px; }
+  .effect-detail { margin-top: 14px; }
+  .detail-heading { display: flex; align-items: center; gap: 8px; }
+  .detail-heading > span:last-child { height: 1px; flex: 1; background: var(--hw-border); }
+  .effect-detail p { margin: 8px 0 0; color: var(--hw-text-secondary); font-size: 12px; line-height: 18px; }
+  .audio-placeholder { display: grid; grid-template-columns: 14px minmax(0, 1fr); gap: 7px; margin: 14px 0 0; padding: 9px; border: 1px dashed var(--hw-border-strong); border-radius: 8px; color: var(--hw-text-tertiary); font-size: 11px; line-height: 17px; }
+  .audio-placeholder span { color: var(--hw-info); }
 
-  .flow-map { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 12px; }
-  .flow-group { min-width: 0; padding: 12px; border: 1px solid var(--hw-border); border-radius: 10px; background: rgba(17, 24, 23, .76); transition: opacity var(--hw-transition-base), filter var(--hw-transition-base), border-color var(--hw-transition-base); }
-  .flow-group--power, .flow-group--boot { grid-column: span 3; }
-  .flow-group--normal { grid-column: span 6; }
-  .flow-group--exception { grid-column: span 8; }
-  .flow-group--charge { grid-column: span 4; border-style: dashed; }
-  .flow-group.is-filtered-out { opacity: .26; filter: grayscale(.3); }
-  .group-heading { display: flex; gap: 9px; align-items: flex-start; margin-bottom: 10px; }
-  .group-index { flex: 0 0 auto; color: var(--hw-text-tertiary); }
-  .group-heading h3 { margin: 0; font-size: 13px; line-height: 18px; }
-  .group-heading p { margin: 2px 0 0; color: var(--hw-text-tertiary); font-size: 11px; line-height: 16px; }
-  .node-stack { display: grid; gap: 8px; }
-  .flow-group--normal .node-stack, .flow-group--exception .node-stack { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .state-node { display: grid; grid-template-columns: 20px minmax(0, 1fr) 14px; align-items: center; min-height: 76px; gap: 9px; padding: 9px; border: 1px solid var(--hw-border); border-radius: 9px; background: var(--hw-surface-2); color: var(--hw-text); text-align: left; cursor: pointer; transition: border-color var(--hw-transition-fast), background-color var(--hw-transition-fast), transform var(--hw-transition-fast), box-shadow var(--hw-transition-fast); }
-  .state-node:hover { border-color: var(--hw-border-strong); background: var(--hw-surface-raised); transform: translateY(-1px); }
-  .state-node.is-selected { box-shadow: inset 0 0 0 1px var(--hw-accent), 0 7px 18px rgba(0, 0, 0, .18); border-color: var(--hw-accent); background: var(--hw-accent-soft); }
-  .state-node--warning.is-selected { border-color: var(--hw-warning); box-shadow: inset 0 0 0 1px var(--hw-warning), 0 7px 18px rgba(0,0,0,.18); background: var(--hw-warning-soft); }
-  .state-node--danger.is-selected { border-color: var(--hw-danger); box-shadow: inset 0 0 0 1px var(--hw-danger), 0 7px 18px rgba(0,0,0,.18); background: var(--hw-danger-soft); }
-  .state-node--info.is-selected { border-color: var(--hw-info); box-shadow: inset 0 0 0 1px var(--hw-info), 0 7px 18px rgba(0,0,0,.18); background: var(--hw-info-soft); }
-  .state-node--offline.is-selected { border-color: var(--hw-border-strong); box-shadow: inset 0 0 0 1px var(--hw-border-strong); background: var(--hw-surface-raised); }
-  .node-content { min-width: 0; }
-  .node-label { display: block; overflow: hidden; color: var(--hw-text-tertiary); font-size: 9px; letter-spacing: .035em; text-overflow: ellipsis; white-space: nowrap; }
-  .state-node strong { display: block; overflow: hidden; margin: 2px 0; font-size: 12px; line-height: 17px; text-overflow: ellipsis; white-space: nowrap; }
-  .node-led { display: block; overflow: hidden; color: var(--hw-text-secondary); font-size: 11px; line-height: 16px; text-overflow: ellipsis; white-space: nowrap; }
-  .node-chevron { width: 14px; height: 14px; fill: none; stroke: var(--hw-text-tertiary); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-  .led-lamp, .led-preview { display: grid; place-items: center; border-radius: 50%; }
-  .led-lamp { width: 20px; height: 20px; border: 1px solid var(--hw-border-strong); background: #070a09; }
-  .led-lamp > span { width: 10px; height: 10px; border-radius: inherit; }
-  .led-lamp--off > span, .led-lamp--neutral > span { background: var(--hw-offline); opacity: .28; }
-  .led-lamp--green-breathe > span, .led-lamp--green-steady > span { background: var(--hw-accent); box-shadow: 0 0 9px var(--hw-accent); }
-  .led-lamp--blue-fast > span { background: var(--hw-info); box-shadow: 0 0 9px var(--hw-info); animation: flash-fast 1.15s ease-in-out infinite; }
-  .led-lamp--orange-slow > span { background: var(--hw-warning); box-shadow: 0 0 9px var(--hw-warning); animation: flash-slow 2.1s ease-in-out infinite; }
-  .led-lamp--orange-fast > span { background: var(--hw-warning); box-shadow: 0 0 9px var(--hw-warning); animation: flash-fast 1.1s ease-in-out infinite; }
-  .led-lamp--red-slow > span { background: var(--hw-danger); box-shadow: 0 0 9px var(--hw-danger); animation: flash-slow 2.1s ease-in-out infinite; }
-  .led-lamp--red-fast > span { background: var(--hw-danger); box-shadow: 0 0 9px var(--hw-danger); animation: flash-fast 1.05s ease-in-out infinite; }
-  .led-lamp--white-steady > span { background: #f1f6f3; box-shadow: 0 0 8px #f1f6f3; }
-  .led-lamp--rainbow-breathe > span { background: conic-gradient(#ff6578, #ffbd59, #3de7a6, #66c7ff, #c681ff, #ff6578); box-shadow: 0 0 9px #d3a6ff; animation: breathe 2.2s ease-in-out infinite; }
-  .led-lamp--charge > span { background: var(--hw-warning); box-shadow: 0 0 9px var(--hw-warning); }
-  .flow-notes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 12px; }
-  .flow-note { display: grid; grid-template-columns: auto 1fr; gap: 8px; padding: 10px; border-left: 2px solid var(--hw-border-strong); border-radius: 0 8px 8px 0; background: rgba(24, 33, 31, .6); }
-  .rule-code { color: var(--hw-text-tertiary); font-size: 10px; }
-  .flow-note p { margin: 0; color: var(--hw-text-secondary); font-size: 12px; line-height: 18px; }
-  .flow-note strong { color: var(--hw-text); font-weight: 600; }
-
-  .detail-card { position: sticky; top: 18px; padding: 20px; background: var(--hw-surface-1); box-shadow: var(--hw-shadow-panel); }
-  .detail-topline { margin-bottom: 14px; }
-  .detail-group { color: var(--hw-text-tertiary); }
-  .detail-code { max-width: 170px; overflow: hidden; color: var(--hw-accent); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
-  .detail-title-row { display: grid; grid-template-columns: minmax(0, 1fr) 36px; align-items: start; gap: 12px; }
-  .detail-title-row h2 { margin-bottom: 7px; outline: none; }
-  .detail-title-row p { margin-bottom: 0; color: var(--hw-text-secondary); font-size: 13px; line-height: 20px; }
-  .detail-tone { display: block; width: 36px; height: 4px; margin-top: 7px; border-radius: 99px; background: var(--hw-accent); }
-  .detail-tone--warning { background: var(--hw-warning); }
-  .detail-tone--danger { background: var(--hw-danger); }
-  .detail-tone--info { background: var(--hw-info); }
-  .detail-tone--offline { background: var(--hw-offline); }
-  .led-output { margin-top: 18px; padding: 12px; border: 1px solid var(--hw-border); border-radius: 10px; background: #0c1210; }
-  .led-output-heading span { color: var(--hw-text-tertiary); }
-  .led-output-heading strong { color: var(--hw-text); font-size: 12px; line-height: 18px; text-align: right; }
-  .led-visual { display: grid; grid-template-columns: 46px minmax(0, 1fr); align-items: center; gap: 12px; margin-top: 10px; }
-  .led-preview { width: 42px; height: 42px; border: 1px solid var(--hw-border-strong); background: #070a09; }
-  .led-preview > span { width: 24px; height: 24px; border-radius: inherit; }
-  .led-preview--off > span, .led-preview--neutral > span { background: var(--hw-offline); opacity: .25; }
-  .led-preview--green-breathe > span { background: var(--hw-accent); box-shadow: 0 0 18px var(--hw-accent); animation: breathe 2.2s ease-in-out infinite; }
-  .led-preview--green-steady > span { background: var(--hw-accent); box-shadow: 0 0 18px var(--hw-accent); }
-  .led-preview--blue-fast > span { background: var(--hw-info); box-shadow: 0 0 18px var(--hw-info); animation: flash-fast 1.15s ease-in-out infinite; }
-  .led-preview--orange-slow > span { background: var(--hw-warning); box-shadow: 0 0 18px var(--hw-warning); animation: flash-slow 2.1s ease-in-out infinite; }
-  .led-preview--orange-fast > span { background: var(--hw-warning); box-shadow: 0 0 18px var(--hw-warning); animation: flash-fast 1.1s ease-in-out infinite; }
-  .led-preview--red-slow > span { background: var(--hw-danger); box-shadow: 0 0 18px var(--hw-danger); animation: flash-slow 2.1s ease-in-out infinite; }
-  .led-preview--red-fast > span { background: var(--hw-danger); box-shadow: 0 0 18px var(--hw-danger); animation: flash-fast 1.05s ease-in-out infinite; }
-  .led-preview--white-steady > span { background: #f1f6f3; box-shadow: 0 0 18px #f1f6f3; }
-  .led-preview--rainbow-breathe > span { background: conic-gradient(#ff6578, #ffbd59, #3de7a6, #66c7ff, #c681ff, #ff6578); box-shadow: 0 0 18px #d3a6ff; animation: breathe 2.2s ease-in-out infinite; }
-  .led-preview--charge > span { background: var(--hw-warning); box-shadow: 0 0 18px var(--hw-warning); }
-  .led-visual p { margin: 0; color: var(--hw-text-secondary); font-size: 12px; line-height: 18px; }
-  .charge-mode { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 9px; padding-top: 9px; border-top: 1px solid var(--hw-border); }
-  .charge-mode[hidden] { display: none; }
-  .charge-mode span { display: inline-flex; align-items: center; gap: 6px; color: var(--hw-text-secondary); font-size: 11px; }
-  .detail-section { margin-top: 18px; }
-  .detail-section-heading { color: var(--hw-text-tertiary); font-size: 10px; letter-spacing: .06em; }
-  .section-line { height: 1px; flex: 1; background: var(--hw-border); }
-  .rule-list { display: grid; gap: 8px; margin: 10px 0 0; padding: 0; list-style: none; }
-  .rule-list li { display: grid; grid-template-columns: 8px minmax(0, 1fr); gap: 8px; color: var(--hw-text-secondary); font-size: 12px; line-height: 18px; }
-  .rule-bullet { width: 6px; height: 6px; margin-top: 6px; border-radius: 50%; background: var(--hw-accent); }
-  .rule-bullet--transition { border-radius: 1px; background: var(--hw-info); transform: rotate(45deg); }
-  .detail-section--buzzer { padding: 10px; border-radius: 8px; background: rgba(24, 33, 31, .65); }
-  .buzzer-copy { margin: 9px 0 0; color: var(--hw-text-secondary); font-size: 12px; line-height: 18px; }
-  .detail-note { margin: 16px 0 0; padding: 10px 0 0 12px; border-top: 1px solid var(--hw-border); border-left: 2px solid var(--hw-warning); color: var(--hw-text-secondary); font-size: 12px; line-height: 18px; }
-
-  .support-grid { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(340px, .7fr); gap: 20px; margin-top: 20px; }
-  .support-card { padding: 20px; }
-  .section-heading--compact { margin-bottom: 14px; }
-  .matrix-note, .sound-chip { padding: 5px 8px; border: 1px solid var(--hw-border); border-radius: var(--hw-radius-pill); color: var(--hw-text-tertiary); font-size: 10px; letter-spacing: 0; }
-  .sound-chip { color: var(--hw-info); background: var(--hw-info-soft); border-color: rgba(102, 199, 255, .25); }
-  .table-wrap { overflow-x: auto; border: 1px solid var(--hw-border); border-radius: 10px; }
-  table { width: 100%; border-collapse: collapse; font-size: 12px; line-height: 18px; }
-  th, td { padding: 11px 12px; border-bottom: 1px solid var(--hw-border); text-align: left; vertical-align: top; }
-  thead th { color: var(--hw-text-tertiary); background: var(--hw-surface-2); font-family: var(--hw-font-mono); font-size: 10px; letter-spacing: .04em; }
-  tbody th { min-width: 104px; color: var(--hw-text); font-weight: 600; }
-  td { min-width: 128px; color: var(--hw-text-secondary); }
-  tbody tr:last-child th, tbody tr:last-child td { border-bottom: 0; }
-  .sound-list { display: grid; gap: 7px; }
-  .sound-row { display: grid; grid-template-columns: 62px minmax(0, 1fr); align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--hw-border); }
-  .sound-row:last-child { border-bottom: 0; }
-  .sound-glyph { color: var(--hw-text-secondary); font-family: var(--hw-font-mono); font-size: 14px; letter-spacing: -.08em; text-align: center; }
-  .sound-glyph--up { color: var(--hw-accent); }
-  .sound-glyph--down { color: var(--hw-info); }
-  .sound-glyph--error { color: var(--hw-danger); }
-  .sound-row strong { display: block; font-size: 13px; line-height: 18px; }
-  .sound-row p { margin: 2px 0 0; color: var(--hw-text-secondary); font-size: 12px; line-height: 18px; }
-
-  .implementation-note { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; align-items: center; gap: 16px; margin-top: 20px; padding: 18px 20px; border: 1px solid rgba(255, 189, 89, .34); border-radius: var(--hw-radius-card); background: linear-gradient(90deg, rgba(56, 40, 18, .72), rgba(17, 24, 23, .88)); }
-  .implementation-mark { display: grid; width: 38px; height: 38px; place-items: center; border: 1px solid rgba(255, 189, 89, .45); border-radius: 10px; color: var(--hw-warning); background: var(--hw-warning-soft); }
-  .implementation-note h2 { margin-bottom: 4px; }
-  .implementation-note p:last-child { margin: 0; color: var(--hw-text-secondary); font-size: 13px; line-height: 20px; }
-  .implementation-note strong { color: var(--hw-text); }
-  .reset-button { min-height: 40px; white-space: nowrap; cursor: pointer; }
+  .compact-reference { display: grid; grid-template-columns: 270px minmax(0, 1fr); gap: 20px; align-items: center; margin-top: 20px; padding: 18px 20px; border: 1px solid rgba(255, 189, 89, .34); border-radius: var(--hw-radius-card); background: linear-gradient(90deg, rgba(56, 40, 18, .68), rgba(17, 24, 23, .88)); }
+  .compact-reference h2 { margin-bottom: 0; }
+  .compact-reference > p { margin: 0; color: var(--hw-text-secondary); font-size: 13px; line-height: 20px; }
+  .compact-reference strong { color: var(--hw-text); }
   .page-footer { margin-top: 20px; padding: 16px 0 0; border-top: 1px solid var(--hw-border); color: var(--hw-text-tertiary); font-family: var(--hw-font-mono); font-size: 11px; line-height: 18px; }
 
   @keyframes breathe { 0%, 100% { opacity: .42; transform: scale(.82); } 50% { opacity: 1; transform: scale(1); } }
-  @keyframes flash-fast { 0%, 37%, 100% { opacity: .32; } 48%, 82% { opacity: 1; } }
-  @keyframes flash-slow { 0%, 100% { opacity: .3; } 50% { opacity: 1; } }
+  @keyframes flash-fast { 0%, 37%, 100% { opacity: .28; } 48%, 82% { opacity: 1; } }
+  @keyframes flash-slow { 0%, 100% { opacity: .28; } 50% { opacity: 1; } }
 
-  @media (max-width: 1080px) {
-    .workspace { grid-template-columns: 1fr; }
-    .detail-card { position: static; }
-    .support-grid { grid-template-columns: 1fr; }
-  }
+  @media (max-width: 1080px) { .strategy-workspace { grid-template-columns: 1fr; } .effect-card { position: static; } }
   @media (max-width: 820px) {
     .system-page { padding: 28px 16px 20px; }
     .hero-grid { grid-template-columns: 1fr; gap: 20px; }
-    .decision-card { max-width: none; }
-    .strategy-summary { grid-template-columns: repeat(2, 1fr); }
-    .summary-item:nth-child(2) { border-right: 0; }
-    .summary-item:nth-child(-n+2) { border-bottom: 1px solid var(--hw-border); }
-    .flow-group--power, .flow-group--boot { grid-column: span 6; }
-    .flow-group--normal, .flow-group--exception, .flow-group--charge { grid-column: span 12; }
+    .primary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .primary-state:nth-child(4n) { border-right: 1px solid var(--hw-border); }
+    .primary-state:nth-child(2n) { border-right: 0; }
+    .primary-state:nth-child(n + 5) { border-bottom: 1px solid var(--hw-border); }
+    .primary-state:nth-child(n + 7) { border-bottom: 0; }
+    .logic-flow { grid-template-columns: 1fr 22px 1fr; row-gap: 8px; }
+    .logic-flow .flow-step:nth-of-type(3) { grid-column: 1 / 2; }
+    .logic-flow .flow-arrow:nth-of-type(4) { display: none; }
+    .logic-flow .flow-step:nth-of-type(4) { grid-column: 2 / 4; }
+    .flow-rule-grid { grid-template-columns: 1fr; }
+    .compact-reference { grid-template-columns: 1fr; gap: 8px; }
   }
   @media (max-width: 620px) {
-    .eyebrow-row, .section-heading, .page-footer { align-items: flex-start; flex-direction: column; }
+    .eyebrow-row, .primary-heading, .page-footer { align-items: flex-start; flex-direction: column; }
     .revision { margin-top: -4px; }
     .hero-copy { font-size: 14px; line-height: 22px; }
-    .filter-set { justify-content: flex-start; }
-    .route-strip { justify-content: flex-start; }
-    .route-arrow span { display: none; }
-    .flow-map { grid-template-columns: 1fr; }
-    .flow-group--power, .flow-group--boot, .flow-group--normal, .flow-group--exception, .flow-group--charge { grid-column: span 1; }
-    .flow-group--normal .node-stack, .flow-group--exception .node-stack { grid-template-columns: 1fr; }
-    .flow-notes { grid-template-columns: 1fr; }
-    .implementation-note { grid-template-columns: 38px minmax(0, 1fr); }
-    .reset-button { grid-column: 1 / -1; width: 100%; }
+    .primary-heading > p { max-width: none; text-align: left; }
+    .active-state-bar { grid-template-columns: 25px 1fr; }
+    .active-state-bar p { grid-column: 1 / -1; }
+    .logic-flow { grid-template-columns: 1fr; }
+    .flow-arrow { min-height: 16px; }
+    .flow-arrow i { width: 1px; height: 14px; }
+    .flow-arrow i::after { top: auto; right: -3px; bottom: 0; transform: rotate(135deg); }
+    .logic-flow .flow-step:nth-of-type(3), .logic-flow .flow-step:nth-of-type(4) { grid-column: auto; }
+    .logic-flow .flow-arrow:nth-of-type(4) { display: grid; }
     .page-footer { gap: 4px; }
   }
-  @media (max-width: 420px) {
-    .strategy-summary { grid-template-columns: 1fr; }
-    .summary-item, .summary-item:nth-child(2) { border-right: 0; border-bottom: 1px solid var(--hw-border); }
-    .summary-item:last-child { border-bottom: 0; }
-    .flow-card, .detail-card, .support-card { padding: 16px; }
-    .route-node { padding: 4px 7px; }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .state-node:hover { transform: none; }
-  }
+  @media (max-width: 420px) { .primary-grid { grid-template-columns: 1fr; } .primary-state, .primary-state:nth-child(4n), .primary-state:nth-child(2n) { border-right: 0; border-bottom: 1px solid var(--hw-border); } .primary-state:last-child { border-bottom: 0; } .flow-card, .effect-card { padding: 16px; } }
+  @media (prefers-reduced-motion: reduce) { .logic-option, .primary-state { transition: none; } }
 </style>
