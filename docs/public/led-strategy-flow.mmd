@@ -1,0 +1,80 @@
+%%{init: {"theme":"base","themeVariables":{"background":"#0A0F0E","primaryColor":"#111817","primaryTextColor":"#F1F6F3","primaryBorderColor":"#41534D","lineColor":"#71817B","secondaryColor":"#18211F","tertiaryColor":"#202B28","clusterBkg":"#111817","clusterBorder":"#2B3935","fontFamily":"Inter, PingFang SC, Microsoft YaHei, sans-serif"}}}%%
+flowchart TB
+  classDef power fill:#18211F,stroke:#78857F,color:#F1F6F3,stroke-width:1px
+  classDef normal fill:#111817,stroke:#3DE7A6,color:#F1F6F3,stroke-width:1px
+  classDef info fill:#112D3C,stroke:#66C7FF,color:#F1F6F3,stroke-width:1px
+  classDef warning fill:#382812,stroke:#FFBD59,color:#F1F6F3,stroke-width:1px
+  classDef danger fill:#3A1720,stroke:#FF6578,color:#F1F6F3,stroke-width:1px
+  classDef overlay fill:#202B28,stroke:#41534D,color:#F1F6F3,stroke-width:1px,stroke-dasharray: 4 3
+  classDef event fill:#0E3024,stroke:#3DE7A6,color:#F1F6F3,stroke-width:1px
+
+  subgraph P[电源域]
+    direction LR
+    OFF["关机 / 彻底断电<br/>LED：熄灭<br/>仅响应开机与恢复出厂"]:::power
+    SLEEP["系统休眠<br/>LED：熄灭（基础）<br/>仅响应开机"]:::power
+    NOPOWER["低电量休眠<br/>按住 1.5 秒无法开机<br/>橙色慢闪反馈"]:::warning
+  end
+
+  subgraph B[启动与配置]
+    direction LR
+    START(("开机音<br/>上升和旋 3 音节")):::event
+    RESET["恢复出厂设置<br/>蜂鸣：滴 1 声<br/>LED：未指定"]:::warning
+    PAIR["初始化配网<br/>LED：蓝色快闪"]:::info
+  end
+
+  subgraph N[系统正常]
+    direction LR
+    IDLE["Idle<br/>LED：绿色呼吸（建议）"]:::normal
+    APP["用户程序<br/>LED：白色常亮"]:::normal
+    DEBUG0["调试模式 / 上位机未连接<br/>LED：绿色常亮"]:::normal
+    DEBUG1["调试模式 / 上位机已连接<br/>LED：彩虹呼吸"]:::normal
+  end
+
+  subgraph X[提示与异常域]
+    direction LR
+    TIP["提醒级提示<br/>LED：橙色慢闪<br/>电量 < 20% 等"]:::warning
+    LOW5["临界低电量<br/>LED：橙色快闪 10 秒"]:::warning
+    UPGRADE["系统升级 / Warning<br/>LED：红色慢闪<br/>按键无响应"]:::danger
+    ERROR["系统异常 / Error<br/>LED：红色快闪<br/>仅响应关机"]:::danger
+  end
+
+  subgraph C[充电覆盖层（不是系统状态）]
+    direction LR
+    USBBAT["USB + 有电池<br/>充电中：橙色常亮<br/>充满：绿色常亮"]:::overlay
+    USBNOBAT["USB + 无电池<br/>不显示充电色<br/>保持系统状态颜色"]:::overlay
+  end
+
+  OFF -->|"按住 1.5 秒"| START
+  SLEEP -->|"按住 1.5 秒"| START
+  NOPOWER -->|"按住 1.5 秒：拒绝启动"| NOPOWER
+  START -->|"进入初始化"| PAIR
+  OFF -->|"按住 6 秒 → 插入 USB → 再保持 6 秒"| RESET
+  RESET -->|"清除完成"| PAIR
+  PAIR -->|"配网完成 / 正常启动"| IDLE
+  IDLE <--> |"运行模式切换"| APP
+  IDLE <--> |"进入调试"| DEBUG0
+  DEBUG0 <--> |"上位机连接"| DEBUG1
+
+  IDLE -->|"按住 1.5 秒 / 下降和旋 3 音节"| OFF
+  APP -->|"按住 1.5 秒 / 下降和旋 3 音节"| OFF
+  DEBUG0 -->|"按住 1.5 秒 / 下降和旋 3 音节"| OFF
+  DEBUG1 -->|"按住 1.5 秒 / 下降和旋 3 音节"| OFF
+  IDLE -->|"按住 6 秒：重置配网"| PAIR
+  APP -->|"按住 6 秒：重置配网"| PAIR
+  DEBUG0 -->|"按住 6 秒：重置配网"| PAIR
+  DEBUG1 -->|"按住 6 秒：重置配网"| PAIR
+
+  TIP -->|"电量 < 5%"| LOW5
+  LOW5 -->|"10 秒后"| SLEEP
+  UPGRADE -->|"操作完成"| IDLE
+  ERROR -->|"关机操作 / 下降和旋 3 音节"| OFF
+
+  USBBAT -. "仅关机 / 休眠时覆盖 LED" .-> OFF
+  USBBAT -. "仅关机 / 休眠时覆盖 LED" .-> SLEEP
+  USBNOBAT -. "仅关机 / 休眠时不叠加充电色" .-> OFF
+  USBNOBAT -. "仅关机 / 休眠时不叠加充电色" .-> SLEEP
+
+  HOTPLUG["外设热插入<br/>蜂鸣：短促上升和弦，2 音节"]:::event
+  ERRORBUZZ["系统异常蜂鸣<br/>与恢复出厂同音节<br/>短促连续 3 遍"]:::event
+  HOTPLUG -. "任意开机正常态" .-> APP
+  ERRORBUZZ -. "异常触发" .-> ERROR
