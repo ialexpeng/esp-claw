@@ -1,59 +1,70 @@
-%%{init: {"theme":"base","themeVariables":{"background":"#0A0F0E","primaryColor":"#111817","primaryTextColor":"#F1F6F3","primaryBorderColor":"#41534D","lineColor":"#71817B","secondaryColor":"#18211F","tertiaryColor":"#202B28","clusterBkg":"#111817","clusterBorder":"#2B3935","fontFamily":"Inter, PingFang SC, Microsoft YaHei, sans-serif"}}}%%
+%%{init: {"theme":"base","themeVariables":{"background":"#0A0F0E","primaryColor":"#111817","primaryTextColor":"#F1F6F3","primaryBorderColor":"#41534D","lineColor":"#71817B","secondaryColor":"#18211F","tertiaryColor":"#202B28","fontFamily":"Inter, PingFang SC, Microsoft YaHei, sans-serif"}}}%%
 flowchart TB
-  classDef power fill:#18211F,stroke:#78857F,color:#F1F6F3,stroke-width:1px
-  classDef normal fill:#111817,stroke:#3DE7A6,color:#F1F6F3,stroke-width:1px
+  classDef state fill:#18211F,stroke:#78857F,color:#F1F6F3,stroke-width:1px
+  classDef on fill:#111817,stroke:#3DE7A6,color:#F1F6F3,stroke-width:1px
+  classDef input fill:#111817,stroke:#41534D,color:#F1F6F3,stroke-width:1px,stroke-dasharray: 4 3
+  classDef decision fill:#14221D,stroke:#FFBD59,color:#F1F6F3,stroke-width:1px
   classDef info fill:#112D3C,stroke:#66C7FF,color:#F1F6F3,stroke-width:1px
   classDef warning fill:#382812,stroke:#FFBD59,color:#F1F6F3,stroke-width:1px
   classDef danger fill:#3A1720,stroke:#FF6578,color:#F1F6F3,stroke-width:1px
-  classDef overlay fill:#202B28,stroke:#FFBD59,color:#F1F6F3,stroke-width:1px,stroke-dasharray: 4 3
 
-  subgraph MAIN[八个主系统状态]
+  OFF["01 · 关机<br/>基础 LED：熄灭"]:::state
+  OFFKEY["用户输入：按住 1.5 秒"]:::input
+  OFFDEC{"电量 ≥ 20%？"}:::decision
+  PAIR["开机子状态：初始化配网<br/>LED：蓝色快闪"]:::info
+  ON["02 · 开机（基础运行 / Idle）<br/>LED：绿色呼吸（建议）"]:::on
+
+  OFF --> OFFKEY --> OFFDEC
+  OFFDEC -->|"是"| PAIR -->|"配网完成"| ON
+  OFFDEC -->|"否：橙色慢闪"| OFF
+
+  subgraph ON_CHILDREN[开机子状态]
     direction LR
-    OFF["01 关机<br/>基础 LED：熄灭"]:::power
-    INIT["02 开机 · 初始化 / 未配网<br/>LED：蓝色快闪"]:::info
-    IDLE["05 开机 · 系统空闲（Idle）<br/>LED：绿色呼吸（建议）"]:::normal
-    PROGRAM["04 开机 · 用户程序<br/>LED：白色常亮"]:::normal
-    DEBUG["03 开机 · 调试模式<br/>未连接：绿色常亮；已连接：彩虹呼吸"]:::normal
+    DEBUG["调试模式<br/>未连：绿色常亮<br/>已连：彩虹呼吸"]:::on
+    PROGRAM["用户程序运行<br/>LED：白色常亮"]:::on
   end
+  ON -->|"进入调试"| DEBUG
+  ON -->|"启动任务"| PROGRAM
+  DEBUG -->|"退出调试"| ON
+  PROGRAM -->|"任务结束"| ON
 
-  OFF -->|"按住 1.5 秒"| INIT
-  INIT -->|"配网完成"| IDLE
-  IDLE -->|"启动任务"| PROGRAM
-  PROGRAM -->|"任务结束"| IDLE
-  IDLE <-->|"进入 / 退出调试"| DEBUG
-  IDLE -->|"按住 1.5 秒"| OFF
-  PROGRAM -->|"按住 1.5 秒"| OFF
-  DEBUG -->|"按住 1.5 秒"| OFF
-  IDLE -->|"按住 6 秒：重置配网"| INIT
-  PROGRAM -->|"按住 6 秒：重置配网"| INIT
-  DEBUG -->|"按住 6 秒：重置配网"| INIT
+  ONKEY["用户输入：开机时长按<br/>1.5 秒关机 / 6 秒重新配网"]:::input
+  ON -. "共享按键规则" .-> ONKEY
+  DEBUG -. "共享按键规则" .-> ONKEY
+  PROGRAM -. "共享按键规则" .-> ONKEY
+  ONKEY -->|"1.5 秒"| OFF
+  ONKEY -->|"6 秒"| PAIR
 
-  subgraph SUB[关键子逻辑]
+  subgraph ALERT[告警提示态：只覆盖 LED]
     direction LR
-    CHARGE["关机 / 休眠 + USB + 有电池<br/>充电中：橙色常亮；充满：绿色常亮<br/>无电池：保持基础状态颜色"]:::overlay
-    LOW["低于 20%：橙色慢闪<br/>低于 5%：橙色快闪 10 秒"]:::warning
-    SLEEP["低电量休眠<br/>按住 1.5 秒拒绝启动<br/>橙色慢闪反馈"]:::warning
+    LOW20["低电量告警<br/>电量 < 20%：橙色慢闪"]:::warning
+    LOW5["临界低电量<br/>电量 < 5%：橙色快闪 10 秒"]:::warning
   end
+  ON -. "覆盖 LED，不改主状态" .-> LOW20
+  DEBUG -. "覆盖 LED，不改主状态" .-> LOW20
+  PROGRAM -. "覆盖 LED，不改主状态" .-> LOW20
+  LOW20 --> LOW5
 
-  CHARGE -. "仅覆盖关机 / 休眠 LED" .-> OFF
-  LOW -->|"10 秒后"| SLEEP
-  SLEEP -->|"充电满足启动条件"| OFF
+  SLEEP["03 · 休眠<br/>基础 LED：熄灭"]:::state
+  LOW5 -->|"10 秒后"| SLEEP
+  SLEEPKEY["用户输入：按住 1.5 秒"]:::input
+  SLEEPDEC{"低电量休眠？"}:::decision
+  SLEEP --> SLEEPKEY --> SLEEPDEC
+  SLEEPDEC -->|"否"| PAIR
+  SLEEPDEC -->|"是：橙色慢闪"| SLEEP
 
-  subgraph PROTECTION[保护状态]
+  subgraph EXCEPTION[系统异常态]
     direction LR
-    WARNING["06 开机 · 系统告警（LED 覆盖）<br/>不改变原有运行状态"]:::overlay
-    UPGRADE["07 开机 · 系统升级<br/>红色慢闪 / 按键锁定"]:::danger
-    ERROR["08 开机 · 系统错误<br/>红色快闪 / 仅可关机"]:::danger
+    UPGRADE["升级中<br/>红色慢闪 / 按键不响应"]:::danger
+    ERROR["其他 Error 状态<br/>红色快闪 / 仅响应关机"]:::danger
   end
-
-  IDLE -. "仅覆盖 LED" .-> WARNING
-  PROGRAM -. "仅覆盖 LED" .-> WARNING
-  DEBUG -. "仅覆盖 LED" .-> WARNING
-  IDLE -->|"不可中断操作"| UPGRADE
-  PROGRAM -->|"不可中断操作"| UPGRADE
-  DEBUG -->|"不可中断操作"| UPGRADE
-  UPGRADE -->|"操作完成 / 回到原状态"| IDLE
-  IDLE -->|"致命错误"| ERROR
-  PROGRAM -->|"致命错误"| ERROR
+  ON -->|"不可打断操作"| UPGRADE -->|"完成后回原状态"| ON
+  ON -->|"致命错误"| ERROR -->|"仅响应关机"| OFF
   DEBUG -->|"致命错误"| ERROR
-  ERROR -->|"仅响应关机"| OFF
+  PROGRAM -->|"致命错误"| ERROR
+
+  RESET["恢复出厂：关机 → 6 秒 → USB → 6 秒<br/>蜂鸣：滴 1 声；LED：未指定"]:::input
+  OFF -. "受保护输入" .-> RESET --> PAIR
+  CHARGE["仅关机 / 休眠时 USB + 有电池<br/>充电中：橙色常亮；充满：绿色常亮<br/>无电池：保持基础状态颜色"]:::warning
+  CHARGE -. "覆盖 LED" .-> OFF
+  CHARGE -. "覆盖 LED" .-> SLEEP
