@@ -7,15 +7,18 @@ import starlightThemeNova from "starlight-theme-nova";
 import astroD2 from "astro-d2";
 import { remarkDocLinks } from "./src/plugins/remark-doc-links.ts";
 
-const BASE = "/";
+const isGitHubPages = process.env.GITHUB_ACTIONS === "true";
+const BASE = isGitHubPages ? "/esp-claw" : "/";
+const FAVICON_PATH = BASE === "/" ? "/favicon.ico" : `${BASE}/favicon.ico`;
 
 export default defineConfig({
+  site: isGitHubPages ? "https://ialexpeng.github.io" : undefined,
   base: BASE,
   integrations: [
     astroD2(),
     starlight({
       title: "ESP-Claw Docs",
-      favicon: "/favicon.ico",
+      favicon: FAVICON_PATH,
       social: [
         {
           icon: "github",
