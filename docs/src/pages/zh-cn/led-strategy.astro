@@ -186,72 +186,69 @@ const initial = interactions.find((item) => item.id === "state-on")!;
           </div>
 
           <div class="flowchart-wrap" role="img" aria-label="覆盖关机、开机、休眠、配网、调试、用户程序、低电量、升级、错误、充电和蜂鸣器规则的传统流程图">
-            <svg class="flowchart" viewBox="0 0 1200 880" aria-hidden="true">
+            <svg class="flowchart" viewBox="0 0 1440 1600" aria-hidden="true">
               <defs>
                 <marker id="arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 Z" fill="#71817B" /></marker>
               </defs>
 
               <g class="lane-labels">
-                <text x="32" y="34">关机启动与恢复出厂</text><text x="32" y="270">休眠唤醒</text><text x="400" y="390">开机运行与子状态</text><text x="32" y="746">低电量保护、异常保护与充电覆盖</text>
+                <text x="50" y="38">A · 关机启动与恢复出厂</text><text x="50" y="360">B · 休眠唤醒与低电量阻止</text><text x="760" y="464">C · 开机运行、调试与用户程序</text><text x="50" y="1110">D · 告警、异常与 USB 充电覆盖</text>
               </g>
-              <g class="flow-lines" fill="none" stroke="#71817B" stroke-width="1.45" marker-end="url(#arrow)">
-                <path d="M177 105 H225" /><path d="M375 105 H405" /><path d="M485 105 H505" />
-                <path d="M685 105 C760 105 790 188 832 230" /><path d="M445 145 V177 H440" /><path d="M250 177 H210 V105 H177" />
-                <path d="M237 210 H330 V150 H595 V140" />
-                <path d="M177 330 H225" /><path d="M375 330 H405" /><path d="M485 330 H505" />
-                <path d="M685 330 C735 330 770 290 800 270" /><path d="M445 370 V395 H400" /><path d="M250 420 H210 V365 H177" />
-                <path d="M820 308 V360 H490 V420" /><path d="M860 308 V520 H490 V540" /><path d="M960 270 H1010 V420" />
-                <path d="M580 456 H595" /><path d="M665 445 H690" /><path d="M630 496 V501 H690" />
-                <path d="M580 575 H610 V600 H760" /><path d="M490 610 V660" />
-                <path d="M850 610 V308" /><path d="M1010 500 V710 H104 V140" /><path d="M920 460 H720 V365 H685" />
-                <path d="M260 805 H310" /><path d="M490 805 H520 V385 H104 V365" />
-                <path d="M695 770 V720 H850 V610" /><path d="M990 770 V850 H104 V140" />
-                <path d="M960 270 H1080 V735 H695 V770" /><path d="M960 280 H1120 V770 H990" />
+              <g class="flow-lines" fill="none" stroke="#71817B" stroke-width="1.55" marker-end="url(#arrow)">
+                <path d="M240 119 H300" /><path d="M480 119 H500" /><path d="M610 119 C660 119 690 195 720 260" /><path d="M940 300 H1080" />
+                <path d="M555 174 V210 H560" /><path d="M420 250 H360 V119 H240" /><path d="M290 250 V315 H650 C680 315 690 310 720 300" />
+                <path d="M240 419 H300" /><path d="M480 419 H500" /><path d="M610 419 C660 419 690 358 720 320" /><path d="M555 474 V510 H560" /><path d="M420 550 H360 V419 H240" />
+                <path d="M1205 340 C1205 405 1040 445 890 510" /><path d="M1205 340 C1205 490 1010 660 890 750" />
+                <path d="M890 550 H1020" /><path d="M1120 550 H1160 V518 H1210" /><path d="M1070 600 V628 H1210" />
+                <path d="M890 570 H940 V1040 H1130" /><path d="M890 790 H960 V1040 H1130" /><path d="M785 830 V900" /><path d="M890 940 H950 V870 H785 V830" />
+                <path d="M1320 831 H1410 V119 H240" /><path d="M1110 831 H1000 V300 H940" /><path d="M1245 1000 V920 H1380 V300 H1330" />
+                <path d="M360 1202 H430" /><path d="M670 1202 H720" /><path d="M1330 315 H1400 V1120 H1095 V1160" /><path d="M1330 325 H1420 V1120 H1320 V1160" />
+                <path d="M1095 1244 V1310 H1410 V300 H1330" /><path d="M1320 1260 V1535 H40 V119 H60" />
+                <path d="M290 1395 H390" /><path d="M490 1395 H590" /><path d="M440 1450 V1510 H590" />
               </g>
-              <g class="flow-lines flow-lines--dashed" fill="none" stroke="#71817B" stroke-width="1.35" stroke-dasharray="5 5" marker-end="url(#arrow)">
-                <path d="M760 270 H700 V735 H170 V770" />
-                <path d="M132 500 V180 H104 V140" /><path d="M232 532 H300 V365 H177" />
-                <path d="M132 580 V190 H104 V140" /><path d="M232 612 H315 V365 H177" /><path d="M580 456 V390 H850 V308" />
+              <g class="flow-lines flow-lines--dashed" fill="none" stroke="#71817B" stroke-width="1.4" stroke-dasharray="5 5" marker-end="url(#arrow)">
+                <path d="M1205 340 V750 H1215 V790" /><path d="M890 590 V700 H1040 V750 H1215" /><path d="M890 790 H1110" />
+                <path d="M1330 300 H1420 V1120 H390 V1202" />
               </g>
               <g class="flow-labels">
-                <text x="280" y="93">按住 1.5 秒</text><text x="392" y="93">判断</text><text x="312" y="153">否：橙色慢闪 / 保持关机</text>
-                <text x="325" y="197">6 秒 → USB → 再保持 6 秒</text><text x="280" y="318">按住 1.5 秒</text><text x="392" y="318">判断</text><text x="312" y="380">是：橙色慢闪 / 保持休眠</text>
-                <text x="742" y="176">配网完成</text><text x="740" y="314">普通休眠</text><text x="645" y="398">进入调试</text><text x="710" y="514">启动用户程序</text><text x="1019" y="390">开机态长按</text>
-                <text x="676" y="435">连接？</text><text x="677" y="432">否</text><text x="650" y="498">是</text><text x="697" y="588">任务结束</text><text x="550" y="650">外设热插入</text>
-                <text x="810" y="350">退出 / 结束</text><text x="785" y="448">按住 6 秒</text><text x="1022" y="696">按住 1.5 秒</text>
-                <text x="285" y="795">电量 &lt; 5%</text><text x="430" y="720">10 秒后 → 低电量休眠</text><text x="790" y="725">不可打断操作</text><text x="1090" y="725">致命错误</text>
-                <text x="350" y="445">仅关机 / 休眠：充电覆盖</text><text x="720" y="402">调试退出</text>
+                <text x="270" y="68">按住 1.5 秒</text><text x="490" y="54">判断</text><text x="660" y="182">满足条件</text><text x="558" y="199">否</text><text x="500" y="306">6 秒 → USB → 再保持 6 秒</text>
+                <text x="270" y="368">按住 1.5 秒</text><text x="490" y="354">判断</text><text x="662" y="392">普通休眠</text><text x="558" y="499">是</text>
+                <text x="1010" y="286">配网完成</text><text x="1030" y="442">进入调试</text><text x="1040" y="645">启动用户程序</text><text x="1178" y="508">否</text><text x="1182" y="616">是</text><text x="950" y="628">退出调试</text><text x="1035" y="778">任务结束</text><text x="930" y="878">外设热插入</text><text x="1200" y="735">共享按键规则</text><text x="1370" y="185">1.5 秒：关机</text><text x="1010" y="360">6 秒：重新配网</text><text x="1245" y="908">退出 / 结束</text>
+                <text x="395" y="1188">低于 5%</text><text x="695" y="1188">10 秒后</text><text x="1115" y="1148">不可打断操作</text><text x="1325" y="1148">高温 / 系统无法工作</text><text x="1195" y="1292">完成后恢复</text><text x="1385" y="1435">仅响应关机</text>
+                <text x="340" y="1380">USB 接入</text><text x="560" y="1380">是</text><text x="520" y="1490">否</text><text x="735" y="1138">开机态 LED 覆盖，解除后恢复底层状态</text><text x="130" y="1340">仅关机 / 休眠</text>
               </g>
 
-              <g class="flow-node flow-node--state" data-flow-id="state-off"><rect x="32" y="70" width="145" height="70" rx="10" /><text x="104" y="95" class="node-kicker">SYSTEM STATE</text><text x="104" y="117" class="node-title">01 · 关机</text><text x="104" y="132" class="node-meta">基础 LED：熄灭</text></g>
-              <g class="flow-node flow-node--input" data-flow-id="input-off-boot"><rect x="225" y="70" width="150" height="70" rx="10" /><text x="300" y="95" class="node-kicker">USER INPUT</text><text x="300" y="117" class="node-title">按住 1.5 秒</text><text x="300" y="132" class="node-meta">尝试开机</text></g>
-              <g class="flow-node flow-node--decision" data-flow-id="decision-off-battery"><path d="M445 65 L485 105 L445 145 L405 105 Z" /><text x="445" y="99" class="node-kicker">电量 ≥</text><text x="445" y="118" class="node-title">20%？</text></g>
-              <g class="flow-node flow-node--state" data-flow-id="sub-pairing"><rect x="505" y="70" width="180" height="70" rx="10" /><text x="595" y="95" class="node-kicker">ON SUBSTATE</text><text x="595" y="117" class="node-title">初始化配网</text><text x="595" y="132" class="node-meta">LED：蓝色快闪</text></g>
-              <g class="flow-node flow-node--input" data-flow-id="input-factory-reset"><rect x="32" y="175" width="205" height="70" rx="10" /><text x="134" y="200" class="node-kicker">PROTECTED INPUT</text><text x="134" y="222" class="node-title">恢复出厂</text><text x="134" y="237" class="node-meta">蜂鸣：滴 1 声</text></g>
-              <g class="flow-node flow-node--output" data-flow-id="off-boot-block"><rect x="250" y="150" width="190" height="55" rx="10" /><text x="345" y="173" class="node-kicker">LOW BATTERY</text><text x="345" y="194" class="node-title">拒绝开机 · 橙色慢闪</text></g>
+              <g class="flow-node flow-node--state" data-flow-id="state-off"><rect x="60" y="80" width="180" height="78" rx="10" /><text x="150" y="106" class="node-kicker">SYSTEM STATE</text><text x="150" y="130" class="node-title">01 · 关机</text><text x="150" y="146" class="node-meta">基础 LED：熄灭</text></g>
+              <g class="flow-node flow-node--input" data-flow-id="input-off-boot"><rect x="300" y="80" width="180" height="78" rx="10" /><text x="390" y="106" class="node-kicker">USER INPUT</text><text x="390" y="130" class="node-title">按住 1.5 秒</text><text x="390" y="146" class="node-meta">尝试开机</text></g>
+              <g class="flow-node flow-node--decision" data-flow-id="decision-off-battery"><path d="M555 64 L610 119 L555 174 L500 119 Z" /><text x="555" y="113" class="node-kicker">电量 ≥</text><text x="555" y="133" class="node-title">20%？</text></g>
+              <g class="flow-node flow-node--input" data-flow-id="input-factory-reset"><rect x="60" y="215" width="230" height="70" rx="10" /><text x="175" y="240" class="node-kicker">PROTECTED INPUT</text><text x="175" y="262" class="node-title">恢复出厂</text><text x="175" y="277" class="node-meta">蜂鸣：滴 1 声</text></g>
+              <g class="flow-node flow-node--output" data-flow-id="off-boot-block"><rect x="420" y="210" width="180" height="80" rx="10" /><text x="510" y="237" class="node-kicker">LOW BATTERY</text><text x="510" y="261" class="node-title">拒绝开机</text><text x="510" y="277" class="node-meta">橙色慢闪 · 保持关机</text></g>
 
-              <g class="flow-node flow-node--state" data-flow-id="state-sleep"><rect x="32" y="295" width="145" height="70" rx="10" /><text x="104" y="320" class="node-kicker">SYSTEM STATE</text><text x="104" y="342" class="node-title">03 · 休眠</text><text x="104" y="357" class="node-meta">基础 LED：熄灭</text></g>
-              <g class="flow-node flow-node--input" data-flow-id="input-sleep-boot"><rect x="225" y="295" width="150" height="70" rx="10" /><text x="300" y="320" class="node-kicker">USER INPUT</text><text x="300" y="342" class="node-title">按住 1.5 秒</text><text x="300" y="357" class="node-meta">尝试唤醒</text></g>
-              <g class="flow-node flow-node--decision" data-flow-id="decision-sleep-battery"><path d="M445 290 L485 330 L445 370 L405 330 Z" /><text x="445" y="324" class="node-kicker">低电量</text><text x="445" y="343" class="node-title">休眠？</text></g>
-              <g class="flow-node flow-node--state" data-flow-id="sub-pairing"><rect x="505" y="295" width="180" height="70" rx="10" /><text x="595" y="320" class="node-kicker">ON SUBSTATE</text><text x="595" y="342" class="node-title">初始化配网</text><text x="595" y="357" class="node-meta">LED：蓝色快闪</text></g>
-              <g class="flow-node flow-node--output" data-flow-id="sleep-boot-block"><rect x="250" y="390" width="150" height="55" rx="10" /><text x="325" y="413" class="node-kicker">LOW BATTERY</text><text x="325" y="434" class="node-title">拒绝开机 · 橙色慢闪</text></g>
+              <g class="flow-node flow-node--state" data-flow-id="state-sleep"><rect x="60" y="380" width="180" height="78" rx="10" /><text x="150" y="406" class="node-kicker">SYSTEM STATE</text><text x="150" y="430" class="node-title">03 · 休眠</text><text x="150" y="446" class="node-meta">基础 LED：熄灭</text></g>
+              <g class="flow-node flow-node--input" data-flow-id="input-sleep-boot"><rect x="300" y="380" width="180" height="78" rx="10" /><text x="390" y="406" class="node-kicker">USER INPUT</text><text x="390" y="430" class="node-title">按住 1.5 秒</text><text x="390" y="446" class="node-meta">尝试唤醒</text></g>
+              <g class="flow-node flow-node--decision" data-flow-id="decision-sleep-battery"><path d="M555 364 L610 419 L555 474 L500 419 Z" /><text x="555" y="413" class="node-kicker">低电量</text><text x="555" y="433" class="node-title">休眠？</text></g>
+              <g class="flow-node flow-node--output" data-flow-id="sleep-boot-block"><rect x="420" y="510" width="180" height="80" rx="10" /><text x="510" y="537" class="node-kicker">LOW BATTERY</text><text x="510" y="561" class="node-title">拒绝开机</text><text x="510" y="577" class="node-meta">橙色慢闪 · 保持休眠</text></g>
 
-              <g class="flow-node flow-node--state" data-flow-id="state-on"><rect x="760" y="230" width="200" height="78" rx="10" /><text x="860" y="255" class="node-kicker">SYSTEM STATE</text><text x="860" y="278" class="node-title">02 · 开机（基础运行 / Idle）</text><text x="860" y="294" class="node-meta">LED：绿色呼吸（建议）</text></g>
-              <g class="flow-node flow-node--state" data-flow-id="sub-debug"><rect x="400" y="420" width="180" height="72" rx="10" /><text x="490" y="445" class="node-kicker">ON SUBSTATE</text><text x="490" y="467" class="node-title">调试模式</text><text x="490" y="482" class="node-meta">由上位机连接状态决定 LED</text></g>
-              <g class="flow-node flow-node--decision" data-flow-id="decision-host-connected"><path d="M630 416 L665 456 L630 496 L595 456 Z" /><text x="630" y="450" class="node-kicker">上位机</text><text x="630" y="468" class="node-title">连接？</text></g>
-              <g class="flow-node flow-node--output" data-flow-id="debug-host-disconnected"><rect x="690" y="390" width="170" height="58" rx="10" /><text x="775" y="413" class="node-kicker">DEBUG OUTPUT</text><text x="775" y="434" class="node-title">未连接 · 绿色常亮</text></g>
-              <g class="flow-node flow-node--output" data-flow-id="debug-host-connected"><rect x="690" y="472" width="170" height="58" rx="10" /><text x="775" y="495" class="node-kicker">DEBUG OUTPUT</text><text x="775" y="516" class="node-title">已连接 · 彩虹呼吸</text></g>
-              <g class="flow-node flow-node--state" data-flow-id="sub-program"><rect x="400" y="540" width="180" height="70" rx="10" /><text x="490" y="565" class="node-kicker">ON SUBSTATE</text><text x="490" y="587" class="node-title">用户程序运行</text><text x="490" y="602" class="node-meta">LED：白色常亮</text></g>
-              <g class="flow-node flow-node--input" data-flow-id="input-hotplug"><rect x="400" y="660" width="180" height="55" rx="10" /><text x="490" y="683" class="node-kicker">SYSTEM EVENT</text><text x="490" y="705" class="node-title">外设热插入 · 2 音节</text></g>
-              <g class="flow-node flow-node--state" data-flow-id="state-on"><rect x="760" y="540" width="180" height="70" rx="10" /><text x="850" y="565" class="node-kicker">RETURN</text><text x="850" y="587" class="node-title">退出 / 任务结束</text><text x="850" y="602" class="node-meta">回到开机基础运行</text></g>
-              <g class="flow-node flow-node--input" data-flow-id="input-on-key"><rect x="920" y="420" width="180" height="80" rx="10" /><text x="1010" y="445" class="node-kicker">USER INPUT</text><text x="1010" y="467" class="node-title">开机态长按</text><text x="1010" y="483" class="node-meta">1.5 秒：关机 / 6 秒：配网</text></g>
+              <g class="flow-node flow-node--state" data-flow-id="sub-pairing"><rect x="720" y="260" width="220" height="80" rx="10" /><text x="830" y="287" class="node-kicker">ON SUBSTATE</text><text x="830" y="311" class="node-title">初始化配网</text><text x="830" y="327" class="node-meta">LED：蓝色快闪</text></g>
+              <g class="flow-node flow-node--state" data-flow-id="state-on"><rect x="1080" y="260" width="250" height="80" rx="10" /><text x="1205" y="287" class="node-kicker">SYSTEM STATE</text><text x="1205" y="311" class="node-title">02 · 开机（基础运行 / Idle）</text><text x="1205" y="327" class="node-meta">LED：绿色呼吸（建议）</text></g>
+              <g class="flow-node flow-node--state" data-flow-id="sub-debug"><rect x="680" y="510" width="210" height="80" rx="10" /><text x="785" y="537" class="node-kicker">ON SUBSTATE</text><text x="785" y="561" class="node-title">调试模式</text><text x="785" y="577" class="node-meta">由上位机连接状态决定 LED</text></g>
+              <g class="flow-node flow-node--decision" data-flow-id="decision-host-connected"><path d="M1070 500 L1120 550 L1070 600 L1020 550 Z" /><text x="1070" y="544" class="node-kicker">上位机</text><text x="1070" y="564" class="node-title">连接？</text></g>
+              <g class="flow-node flow-node--output" data-flow-id="debug-host-disconnected"><rect x="1210" y="480" width="180" height="76" rx="10" /><text x="1300" y="507" class="node-kicker">DEBUG OUTPUT</text><text x="1300" y="531" class="node-title">未连接</text><text x="1300" y="547" class="node-meta">绿色常亮</text></g>
+              <g class="flow-node flow-node--output" data-flow-id="debug-host-connected"><rect x="1210" y="590" width="180" height="76" rx="10" /><text x="1300" y="617" class="node-kicker">DEBUG OUTPUT</text><text x="1300" y="641" class="node-title">已连接</text><text x="1300" y="657" class="node-meta">彩虹呼吸</text></g>
+              <g class="flow-node flow-node--state" data-flow-id="sub-program"><rect x="680" y="750" width="210" height="80" rx="10" /><text x="785" y="777" class="node-kicker">ON SUBSTATE</text><text x="785" y="801" class="node-title">用户程序运行</text><text x="785" y="817" class="node-meta">LED：白色常亮</text></g>
+              <g class="flow-node flow-node--input" data-flow-id="input-hotplug"><rect x="680" y="900" width="210" height="80" rx="10" /><text x="785" y="927" class="node-kicker">SYSTEM EVENT</text><text x="785" y="951" class="node-title">外设热插入</text><text x="785" y="967" class="node-meta">蜂鸣：短促上升和弦 2 音节</text></g>
+              <g class="flow-node flow-node--input" data-flow-id="input-on-key"><rect x="1110" y="790" width="210" height="82" rx="10" /><text x="1215" y="817" class="node-kicker">USER INPUT</text><text x="1215" y="841" class="node-title">开机态长按</text><text x="1215" y="857" class="node-meta">1.5 秒：关机 / 6 秒：配网</text></g>
+              <g class="flow-node flow-node--state"><rect x="1130" y="1000" width="230" height="80" rx="10" /><text x="1245" y="1027" class="node-kicker">RETURN</text><text x="1245" y="1051" class="node-title">退出 / 任务结束</text><text x="1245" y="1067" class="node-meta">回到开机基础运行</text></g>
 
-              <g class="flow-node flow-node--alert" data-flow-id="alert-low"><rect x="80" y="770" width="180" height="70" rx="10" /><text x="170" y="795" class="node-kicker">ALERT OVERLAY</text><text x="170" y="817" class="node-title">低电量告警</text><text x="170" y="832" class="node-meta">&lt; 20%：橙色慢闪</text></g>
-              <g class="flow-node flow-node--alert" data-flow-id="alert-critical"><rect x="310" y="770" width="180" height="70" rx="10" /><text x="400" y="795" class="node-kicker">LOW BATTERY</text><text x="400" y="817" class="node-title">临界低电量</text><text x="400" y="832" class="node-meta">&lt; 5%：橙色快闪 10 秒</text></g>
-              <g class="flow-node flow-node--exception" data-flow-id="exception-upgrade"><rect x="600" y="770" width="190" height="70" rx="10" /><text x="695" y="795" class="node-kicker">SYSTEM EXCEPTION</text><text x="695" y="817" class="node-title">升级中</text><text x="695" y="832" class="node-meta">红色慢闪 / 按键不响应</text></g>
-              <g class="flow-node flow-node--exception" data-flow-id="exception-error"><rect x="900" y="770" width="180" height="70" rx="10" /><text x="990" y="795" class="node-kicker">SYSTEM EXCEPTION</text><text x="990" y="817" class="node-title">其他 Error 状态</text><text x="990" y="832" class="node-meta">红色快闪 / 仅关机</text></g>
-              <g class="flow-node flow-node--overlay" data-flow-id="charge-battery"><rect x="32" y="500" width="200" height="64" rx="10" /><text x="132" y="523" class="node-kicker">CHARGE OVERLAY</text><text x="132" y="545" class="node-title">USB + 有电池</text><text x="132" y="558" class="node-meta">橙色常亮 / 充满绿色常亮</text></g>
-              <g class="flow-node flow-node--overlay" data-flow-id="charge-nobattery"><rect x="32" y="580" width="200" height="64" rx="10" /><text x="132" y="603" class="node-kicker">CHARGE OVERLAY</text><text x="132" y="625" class="node-title">USB + 无电池</text><text x="132" y="638" class="node-meta">维持系统基础状态显示</text></g>
+              <g class="flow-node flow-node--alert" data-flow-id="alert-low"><rect x="80" y="1160" width="280" height="84" rx="10" /><text x="220" y="1187" class="node-kicker">ALERT OVERLAY</text><text x="220" y="1211" class="node-title">低电量告警 · 电量 &lt; 20%</text><text x="220" y="1227" class="node-meta">橙色慢闪，只覆盖 LED</text></g>
+              <g class="flow-node flow-node--alert" data-flow-id="alert-critical"><rect x="430" y="1160" width="240" height="84" rx="10" /><text x="550" y="1187" class="node-kicker">LOW BATTERY</text><text x="550" y="1211" class="node-title">临界低电量 · &lt; 5%</text><text x="550" y="1227" class="node-meta">橙色快闪 10 秒</text></g>
+              <g class="flow-node flow-node--state" data-flow-id="state-sleep"><rect x="720" y="1160" width="230" height="84" rx="10" /><text x="835" y="1187" class="node-kicker">SYSTEM STATE</text><text x="835" y="1211" class="node-title">进入低电量休眠</text><text x="835" y="1227" class="node-meta">随后按低电量休眠规则拒绝启动</text></g>
+              <g class="flow-node flow-node--exception" data-flow-id="exception-upgrade"><rect x="970" y="1160" width="250" height="84" rx="10" /><text x="1095" y="1187" class="node-kicker">SYSTEM EXCEPTION</text><text x="1095" y="1211" class="node-title">升级中</text><text x="1095" y="1227" class="node-meta">红色慢闪 · 按键不响应</text></g>
+              <g class="flow-node flow-node--exception" data-flow-id="exception-error"><rect x="1240" y="1160" width="160" height="100" rx="10" /><text x="1320" y="1187" class="node-kicker">SYSTEM ERROR</text><text x="1320" y="1211" class="node-title">其他 Error</text><text x="1320" y="1227" class="node-meta">红色快闪</text><text x="1320" y="1243" class="node-meta">仅可关机</text></g>
+              <g class="flow-node flow-node--input"><rect x="70" y="1350" width="220" height="80" rx="10" /><text x="180" y="1377" class="node-kicker">USB INPUT</text><text x="180" y="1401" class="node-title">USB 接入</text><text x="180" y="1417" class="node-meta">仅关机 / 休眠触发覆盖</text></g>
+              <g class="flow-node flow-node--decision"><path d="M440 1340 L490 1395 L440 1450 L390 1395 Z" /><text x="440" y="1389" class="node-kicker">有电池？</text><text x="440" y="1409" class="node-title">检测</text></g>
+              <g class="flow-node flow-node--overlay" data-flow-id="charge-battery"><rect x="590" y="1350" width="280" height="80" rx="10" /><text x="730" y="1377" class="node-kicker">CHARGE OVERLAY</text><text x="730" y="1401" class="node-title">有电池：USB 充电</text><text x="730" y="1417" class="node-meta">橙色常亮 / 充满绿色常亮</text></g>
+              <g class="flow-node flow-node--overlay" data-flow-id="charge-nobattery"><rect x="590" y="1470" width="280" height="80" rx="10" /><text x="730" y="1497" class="node-kicker">CHARGE OVERLAY</text><text x="730" y="1521" class="node-title">无电池：USB 接入</text><text x="730" y="1537" class="node-meta">不显示充电色，维持基础状态</text></g>
             </svg>
           </div>
           <div class="legend" aria-label="流程图图例">
