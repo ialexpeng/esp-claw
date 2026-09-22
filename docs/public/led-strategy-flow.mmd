@@ -1,0 +1,93 @@
+%%{init: {"theme":"base","themeVariables":{"background":"#0A0F0E","primaryColor":"#18211F","primaryTextColor":"#F1F6F3","primaryBorderColor":"#41534D","lineColor":"#71817B","secondaryColor":"#111817","tertiaryColor":"#202B28","fontFamily":"Inter, PingFang SC, Microsoft YaHei, sans-serif"}}}%%
+flowchart TB
+  classDef state fill:#18211F,stroke:#41534D,color:#F1F6F3,stroke-width:1px
+  classDef input fill:#111817,stroke:#41534D,color:#F1F6F3,stroke-width:1px,stroke-dasharray:4 3
+  classDef decision fill:#18201D,stroke:#41534D,color:#F1F6F3,stroke-width:1px
+  classDef output fill:#171D1B,stroke:#41534D,color:#F1F6F3,stroke-width:1px
+  classDef overlay fill:#191917,stroke:#41534D,color:#F1F6F3,stroke-width:1px,stroke-dasharray:4 3
+  classDef exception fill:#1B1719,stroke:#41534D,color:#F1F6F3,stroke-width:1px
+
+  subgraph BOOT[关机：启动与恢复出厂]
+    direction LR
+    OFF["01 · 关机<br/>基础 LED：熄灭"]:::state
+    OFF_KEY["用户输入<br/>按住 1.5 秒"]:::input
+    OFF_BAT{"电量 ≥ 20%？"}:::decision
+    OFF_BLOCK["拒绝开机<br/>橙色慢闪<br/>回到关机"]:::output
+    RESET["恢复出厂<br/>6 秒 → USB → 6 秒<br/>滴 1 声"]:::input
+    OFF --> OFF_KEY --> OFF_BAT
+    OFF_BAT -->|"否"| OFF_BLOCK --> OFF
+    OFF -. "受保护输入" .-> RESET
+  end
+
+  PAIR["开机子状态：初始化配网<br/>LED：蓝色快闪<br/>开机音：上升和旋 3 音节"]:::state
+  OFF_BAT -->|"是"| PAIR
+  RESET -->|"成功"| PAIR
+
+  subgraph RUNTIME[开机：基础运行与子状态]
+    direction TB
+    ON["02 · 开机（基础运行 / Idle）<br/>LED：绿色呼吸（建议）"]:::state
+    ACTIVE["开机上下文<br/>Idle / 初始化配网 / 调试 / 用户程序"]:::state
+    PAIR_DONE["配网完成"]:::output
+    DEBUG["调试模式"]:::state
+    HOST{"上位机已连接？"}:::decision
+    DEBUG_OFF["未连接<br/>绿色常亮"]:::output
+    DEBUG_ON["已连接<br/>彩虹呼吸"]:::output
+    PROGRAM["用户程序运行<br/>白色常亮"]:::state
+    HOTPLUG["外设热插入<br/>上升和弦 2 音节<br/>程序继续运行"]:::input
+    ON_KEY["开机态用户输入<br/>1.5 秒：关机<br/>6 秒：重新配网"]:::input
+  end
+
+  PAIR --> PAIR_DONE --> ON --> ACTIVE
+  ACTIVE -->|"进入调试"| DEBUG --> HOST
+  HOST -->|"否"| DEBUG_OFF
+  HOST -->|"是"| DEBUG_ON
+  DEBUG_OFF -->|"上位机连接"| DEBUG_ON
+  DEBUG_ON -->|"上位机断开"| DEBUG_OFF
+  DEBUG -->|"退出调试"| ON
+  ACTIVE -->|"启动用户程序"| PROGRAM
+  PROGRAM -->|"任务结束"| ON
+  PROGRAM --> HOTPLUG --> PROGRAM
+  ACTIVE -. "Idle / 调试 / 程序均适用" .-> ON_KEY
+  ON_KEY -->|"1.5 秒：下降和旋 3 音节"| OFF
+  ON_KEY -->|"6 秒"| PAIR
+
+  subgraph LOWPOWER[低电量：告警覆盖与休眠保护]
+    direction LR
+    LOW20["电量 < 20%<br/>橙色慢闪<br/>只覆盖 LED"]:::overlay
+    LOW5["电量 < 5%<br/>橙色快闪 10 秒"]:::overlay
+    SLEEP["03 · 低电量休眠<br/>基础 LED：熄灭"]:::state
+  end
+  ACTIVE -. "告警覆盖；解除后恢复原输出" .-> LOW20
+  LOW20 -->|"低于 5%"| LOW5 -->|"10 秒后"| SLEEP
+
+  subgraph SLEEP_PATH[休眠：唤醒判断]
+    direction LR
+    SLEEP_KEY["用户输入<br/>按住 1.5 秒"]:::input
+    SLEEP_BAT{"低电量休眠？"}:::decision
+    SLEEP_BLOCK["拒绝开机<br/>橙色慢闪<br/>保持休眠"]:::output
+  end
+  SLEEP --> SLEEP_KEY --> SLEEP_BAT
+  SLEEP_BAT -->|"否：上升和旋 3 音节"| PAIR
+  SLEEP_BAT -->|"是"| SLEEP_BLOCK --> SLEEP
+
+  subgraph EXCEPTION[系统异常态]
+    direction LR
+    UPGRADE["升级中<br/>红色慢闪<br/>按键不响应"]:::exception
+    RESUME["升级完成<br/>恢复进入前开机上下文"]:::output
+    ERROR["其他 Error 状态<br/>红色快闪<br/>仅可关机<br/>难听音调 × 3"]:::exception
+  end
+  ACTIVE -->|"不可打断操作"| UPGRADE --> RESUME --> ACTIVE
+  ACTIVE -->|"高温 / 系统无法工作"| ERROR -->|"关机"| OFF
+
+  subgraph CHARGING[仅关机 / 休眠：USB 充电覆盖]
+    direction LR
+    USB["USB 接入"]:::input
+    HAS_BAT{"有电池？"}:::decision
+    CHARGE["有电池<br/>充电：橙色常亮<br/>充满：绿色常亮"]:::overlay
+    NO_BAT["无电池<br/>不显示充电色<br/>维持基础状态显示"]:::overlay
+  end
+  OFF -. "USB 覆盖入口" .-> USB
+  SLEEP -. "USB 覆盖入口" .-> USB
+  USB --> HAS_BAT
+  HAS_BAT -->|"是"| CHARGE
+  HAS_BAT -->|"否"| NO_BAT

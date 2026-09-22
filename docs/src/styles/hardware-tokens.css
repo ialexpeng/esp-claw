@@ -1,0 +1,162 @@
+/* Cyber Hardware UI System — framework-neutral design tokens */
+:root {
+  color-scheme: dark;
+
+  /* Typography */
+  --hw-font-ui: Inter, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+  --hw-font-mono: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+
+  /* Surfaces */
+  --hw-canvas: #0a0f0e;
+  --hw-surface-1: #111817;
+  --hw-surface-2: #18211f;
+  --hw-surface-raised: #202b28;
+  --hw-scrim: rgb(4 8 7 / 72%);
+
+  /* Content */
+  --hw-text: #f1f6f3;
+  --hw-text-secondary: #a9b7b1;
+  --hw-text-tertiary: #71817b;
+  --hw-border: #2b3935;
+  --hw-border-strong: #41534d;
+
+  /* State */
+  --hw-accent: #3de7a6;
+  --hw-accent-hover: #67f0bd;
+  --hw-accent-active: #20c782;
+  --hw-accent-ink: #062218;
+  --hw-accent-soft: #0e3024;
+  --hw-info: #66c7ff;
+  --hw-info-soft: #112d3c;
+  --hw-warning: #ffbd59;
+  --hw-warning-soft: #382812;
+  --hw-danger: #ff6578;
+  --hw-danger-soft: #3a1720;
+  --hw-offline: #78857f;
+
+  /* Scale */
+  --hw-space-1: 4px;
+  --hw-space-2: 8px;
+  --hw-space-3: 12px;
+  --hw-space-4: 16px;
+  --hw-space-5: 20px;
+  --hw-space-6: 24px;
+  --hw-space-8: 32px;
+  --hw-space-10: 40px;
+  --hw-space-12: 48px;
+
+  --hw-radius-control: 10px;
+  --hw-radius-card: 14px;
+  --hw-radius-pill: 999px;
+  --hw-control-height: 40px;
+  --hw-control-height-touch: 44px;
+
+  --hw-shadow-card: 0 10px 28px rgb(0 0 0 / 18%);
+  --hw-shadow-panel: 0 20px 56px rgb(0 0 0 / 42%);
+  --hw-transition-fast: 160ms ease-out;
+  --hw-transition-base: 220ms ease-out;
+  --hw-transition-panel: 300ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Optional baseline. Scope these rules under an application root if global styles conflict. */
+body {
+  margin: 0;
+  background: var(--hw-canvas);
+  color: var(--hw-text);
+  font-family: var(--hw-font-ui);
+  font-size: 14px;
+  line-height: 1.571;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--hw-accent);
+  outline-offset: 2px;
+}
+
+.hw-card {
+  background: var(--hw-surface-1);
+  border: 1px solid var(--hw-border);
+  border-radius: var(--hw-radius-card);
+  box-shadow: var(--hw-shadow-card);
+}
+
+.hw-button-primary,
+.hw-button-secondary {
+  min-height: var(--hw-control-height);
+  border-radius: var(--hw-radius-control);
+  padding: 0 var(--hw-space-4);
+  font-weight: 600;
+  transition: background-color var(--hw-transition-fast), border-color var(--hw-transition-fast), transform var(--hw-transition-fast);
+}
+
+.hw-button-primary {
+  border: 1px solid var(--hw-accent);
+  background: var(--hw-accent);
+  color: var(--hw-accent-ink);
+}
+
+.hw-button-primary:hover {
+  background: var(--hw-accent-hover);
+}
+
+.hw-button-primary:active,
+.hw-button-secondary:active {
+  transform: translateY(1px);
+}
+
+.hw-button-secondary {
+  border: 1px solid var(--hw-border-strong);
+  background: var(--hw-surface-2);
+  color: var(--hw-text);
+}
+
+.hw-button-secondary:hover {
+  border-color: var(--hw-text-secondary);
+  background: var(--hw-surface-raised);
+}
+
+.hw-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  border-radius: var(--hw-radius-pill);
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+}
+
+.hw-status--connected { background: var(--hw-accent-soft); color: var(--hw-accent); }
+.hw-status--syncing { background: var(--hw-info-soft); color: var(--hw-info); }
+.hw-status--warning { background: var(--hw-warning-soft); color: var(--hw-warning); }
+.hw-status--error { background: var(--hw-danger-soft); color: var(--hw-danger); }
+.hw-status--offline { background: var(--hw-surface-raised); color: var(--hw-offline); }
+
+.hw-mono {
+  font-family: var(--hw-font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+}
+
+@media (max-width: 767px) {
+  :root { --hw-control-height: var(--hw-control-height-touch); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

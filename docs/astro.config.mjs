@@ -7,7 +7,8 @@ import starlightThemeNova from "starlight-theme-nova";
 import astroD2 from "astro-d2";
 import { remarkDocLinks } from "./src/plugins/remark-doc-links.ts";
 
-const BASE = "/";
+const requestedBase = process.env.PUBLIC_BASE_PATH?.trim();
+const BASE = requestedBase && requestedBase !== "/" ? requestedBase.replace(/\/+$/, "") : "/";
 
 export default defineConfig({
   base: BASE,
