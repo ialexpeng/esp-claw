@@ -2,7 +2,7 @@
 
 **Prepared by:** Manus AI
 **Handover date:** 2026-09-22
-**Package identity:** See `HANDOVER_MANIFEST.txt` in the delivered archive for the exact Git revision, archive checksum, and included build assets.
+**Package identity:** See `HANDOVER_MANIFEST.txt` in the delivered archive for the exact Git revision and included build assets. The adjacent `.sha256` file verifies the archive checksum.
 
 ## Purpose and current state
 
