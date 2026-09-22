@@ -1,6 +1,8 @@
 ---
 import "../../styles/hardware-tokens.css";
 
+const assetBase = import.meta.env.BASE_URL.endsWith("/") ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`;
+
 const interactions = [
   {
     id: "state-off", group: "system", code: "SYSTEM STATE", title: "关机", short: "彻底断电",
@@ -166,11 +168,11 @@ const initial = interactions.find((item) => item.id === "state-on")!;
             <span class="decision-label">阅读方式</span>
             <strong>先选规则，再看 2 px 渐变光边节点；右侧效果卡给出 LED、按键与蜂鸣器。</strong>
             <p>实线表示状态转换，虚线表示覆盖或共享规则。每条分支均标注明确的成功、拒绝或返回去向。</p>
-            <a class="hw-button-primary source-action" href="/led-strategy-flow.mmd" download>
+            <a class="hw-button-primary source-action" href={`${assetBase}led-strategy-flow.mmd`} download>
               <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3v11m0 0 4-4m-4 4-4-4M5 17v3h14v-3" /></svg>
               下载流程图源码
             </a>
-            <a class="source-graphic" href="/led-strategy-flow.png" target="_blank" rel="noreferrer">查看可下载流程图 PNG ↗</a>
+            <a class="source-graphic" href={`${assetBase}led-strategy-flow.png`} target="_blank" rel="noreferrer">查看可下载流程图 PNG ↗</a>
           </aside>
         </div>
       </header>
